@@ -1,4 +1,4 @@
-switchvar.py#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Wed Dec 18 14:59:26 2019

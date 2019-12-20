@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 18 15:13:36 2019
+Created on Fri Dec 20 14:42:13 2019
 
 @author: leguillou
 """
 
 # path and netcdf file of the NATL60 outputs
-path_reference = '/Users/leguillou/WORK/Developpement/DATA/NATL60/regular_grid/hourly_merged/'
+path_reference = '/mnt/meom/workdir/leguilfl/DATA/NATL60/regular_grid/daily/'
 file_reference = 'NATL60GULFSTREAM_2012-10-01_2013-09-30.1d.nc' #'NATL60OSMOSIS_2012-10-01_2013-09-10.1d.nc'
-path_duacs = '/Users/leguillou/WORK/Developpement/DATA/DUACS-OI_maps/ssh_model/'
+path_duacs = '/mnt/meom/workdir/leguilfl/DATA/DUACS-OI_maps/ssh_model/'
 file_duacs = 'ssh_sla_boost_NATL60_swot_en_j1_tpn_g2.nc'
 
 # Name of the time and grid variables in the NATL60 netcdf file.
@@ -28,7 +28,4 @@ ncentred = 60
 
 interp = 'cubic'
 
-path_out =  '/Users/leguillou/WORK/Developpement/experiences/DUACS-comparison/'
-
-
-
+path_out =  '/mnt/meom/workdir/leguilfl/experiences/DUACS_comparisons/'

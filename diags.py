@@ -1,95 +1,61 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Dec 18 18:48:38 2019
+Created on Fri Dec 20 14:59:19 2019
 
 @author: leguillou
 """
 
 import argparse 
 import sys, os
-import netCDF4 as nc
 import numpy as np 
-from PowerSpec import wavenumber_spectra
+from scipy import interpolate
 import pickle
 
-def read_data(path_data, prods, bc):
+def compute_mean_rmse(rmse, prods):
     
-    data = {}
-    ncin = nc.Dataset(path_data+'/data_interpolated.nc')
-    # Time and grid
-    data['time'] = ncin.variables['time'][:]
-    data['lon'] = ncin.variables['lon'][bc:-(bc+1),bc:-(bc+1)]
-    data['lat'] = ncin.variables['lat'][bc:-(bc+1),bc:-(bc+1)]
-    # Variables
-    data['ref'] = {}
-    data['duacs'] = {}
-    data['da'] = {}
+    mean_rmse_duacs = [] 
+    mean_rmse_da = []
+    rmse_data = rmse['RMSE']
     for prod in prods:
-        data['ref'][prod] = ncin.variables[prod+'_ref'][:,bc:-(bc+1),bc:-(bc+1)]
-        data['duacs'][prod] = ncin.variables[prod+'_duacs'][:,bc:-(bc+1),bc:-(bc+1)]
-        data['da'][prod] = ncin.variables[prod+'_da'][:,bc:-(bc+1),bc:-(bc+1)]
-    
-    return data
-
-
-
-def diag_spec(data, prods):
-    
-    PSD = {'ref':{},'duacs':{},'da':{}}
-    recScore = {'duacs':{},'da':{}}
-    
-    NT = data['time'].size
-    lon = data['lon']
-    lat = data['lat']
-    
-    # Loop on variables 
-    for prod in prods:
-        # Initialize lists
-        PSD['ref'][prod] = []
-        PSD['duacs'][prod] = []
-        PSD['da'][prod] = []
-        recScore['duacs'][prod] = []
-        recScore['da'][prod] = []
-        # Time loop
-        for t in range(NT):
-            # Compute PSD of the fields and the erros at each timestamp
-            wavenumber, psd2D_ref_t = wavenumber_spectra(data['ref'][prod][t],lon,lat) 
-            wavenumber, psd2D_duacs_t = wavenumber_spectra(data['duacs'][prod][t],lon,lat) 
-            wavenumber, psd2D_da_t = wavenumber_spectra(data['da'][prod][t],lon,lat) 
-            wavenumber, psd2D_err_duacs_t = wavenumber_spectra(data['duacs'][prod][t]-data['ref'][prod][t],lon,lat) 
-            wavenumber, psd2D_err_da_t = wavenumber_spectra(data['da'][prod][t]-data['ref'][prod][t],lon,lat)            
-            # Append to list
-            PSD['ref'][prod].append(psd2D_ref_t)
-            PSD['duacs'][prod].append(psd2D_duacs_t)
-            PSD['da'][prod].append(psd2D_da_t)
-            recScore['duacs'][prod].append(psd2D_err_duacs_t)
-            recScore['da'][prod].append(psd2D_err_da_t)                
-        # Average temporally 
-        PSD['ref'][prod] = np.mean(PSD['ref'][prod],axis=0)
-        PSD['duacs'][prod] = np.mean(PSD['duacs'][prod],axis=0)
-        PSD['da'][prod] = np.mean(PSD['da'][prod],axis=0)
-        recScore['duacs'][prod] = 1 - np.mean(recScore['duacs'][prod],axis=0)/np.mean(PSD['ref'][prod],axis=0)
-        recScore['da'][prod] = 1 - np.mean(recScore['da'][prod],axis=0)/np.mean(PSD['ref'][prod],axis=0)
-
-    return {'wavenumber':wavenumber,'PSD':PSD, 'recScore':recScore}
-
-
-
-
-def diag_rmse(data, prods):
-    
-    RMSE = {'duacs':{},'da':{}}
-    
-    for prod in prods:  
-        NT,NY,NX = data['ref'][prod].shape          
-        RMSE['duacs'][prod] = [np.sqrt(np.sum(np.sum(np.square(data['duacs'][prod][t,:,:]-data['ref'][prod][t,:,:])))/NY/NX) for t in range(NT)]
-        RMSE['da'][prod] = [np.sqrt(np.sum(np.sum(np.square(data['da'][prod][t,:,:]-data['ref'][prod][t,:,:])))/NY/NX) for t in range(NT)]
+        mean_rmse_duacs.append(np.mean(rmse_data['duacs'][prod]))
+        mean_rmse_da.append(np.mean(rmse_data['da'][prod]))
         
-    return {'time':data['time'], 'RMSE':RMSE}
+    return mean_rmse_duacs, mean_rmse_da
 
+def compute_eff_res(spec, prods):
+    
+    eff_res_duacs = []
+    eff_res_da = []
+    wavenumber = spec['wavenumber'] *1e3  # in cycle/km
+    recScore_data = spec['recScore']
+    for prod in prods:
+        f_duacs = interpolate.interp1d(recScore_data['duacs'][prod], 1/wavenumber, axis=0)   
+        eff_res_duacs.append(f_duacs(0.5))
+        f_da = interpolate.interp1d(recScore_data['da'][prod], 1/wavenumber, axis=0)   
+        eff_res_da.append(f_da(0.5))
+        
+    return eff_res_duacs, eff_res_da
 
-
+def write_outputs(file,mean_rmse_duacs,mean_rmse_da,eff_res_duacs,eff_res_da, prods):
+    f = open(file,'w')
+    # DUACS
+    f.write('DUACS\n')
+    f.write('\t RMSE:\n' )
+    for i,prod in enumerate(prods):
+        f.write('\t\t' + prod + ': ' + "{:.3E}".format(mean_rmse_duacs[i]) + '\n') 
+    f.write('\t Eff Res:\n' )
+    for i,prod in enumerate(prods):
+        f.write('\t\t' + prod + ': ' + "{:.3E}".format(eff_res_duacs[i]) + '\n')            
+    # DA
+    f.write('\nDA\n')
+    f.write('\t RMSE:\n' )
+    for i,prod in enumerate(prods):
+        f.write('\t\t' + prod + ': ' + "{:.3E}".format(mean_rmse_da[i]) + '\n') 
+    f.write('\t Eff Res:\n' )
+    for i,prod in enumerate(prods):
+        f.write('\t\t' + prod + ': ' + "{:.3E}".format(eff_res_da[i]) + '\n') 
+                
 
 ##======================================================================================================================##
 ##                MAIN                                                                                                  ##
@@ -122,41 +88,36 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     #    Diagnostics                #
     #+++++++++++++++++++++++++++++++#
-    file_outputs = comp.path_out+exp.name_experiment +'/diags.pic'
+    file_inputs = comp.path_out+exp.name_experiment +'/analysis.pic'
+    file_outputs = comp.path_out+exp.name_experiment +'/diags.txt'
     if os.path.isfile(file_outputs) and opts.overwrite!=1: 
         print(file_outputs, 'already exists')
     else:
         if opts.overwrite==1: 
             print('Warning:', file_outputs, 'already exists but you ask to overwrite it')
         #+++++++++++++++++++++++++++++++#
-        #    Read interpolated fields   #
+        #    Read analysis              #
         #+++++++++++++++++++++++++++++++#
-        print('\n* Read interpolated fields')
-        data = read_data(comp.path_out+exp.name_experiment, opts.prods, exp.lenght_bc)
+        print('\n* Read Analysis')        
+        with open(file_inputs, 'rb') as f:
+            spec, rmse = pickle.load(f)
         
         #+++++++++++++++++++++++++++++++#
-        #    Spectral Analysis          #
+        #    Evaluate metrics           #
         #+++++++++++++++++++++++++++++++#
-        print('\n* Spectral Analysis')
-        spec = diag_spec(data, opts.prods)
+        print('\n* Evaluate metrics ')
+        mean_rmse_duacs, mean_rmse_da = compute_mean_rmse(rmse, opts.prods)
+        print(mean_rmse_duacs, mean_rmse_da)
+        eff_res_duacs, eff_res_da = compute_eff_res(spec, opts.prods)
+        print(eff_res_duacs, eff_res_da)
         
         #+++++++++++++++++++++++++++++++#
-        #    RMSE Analysis              #
+        #    Write outputs              #
         #+++++++++++++++++++++++++++++++#
-        print('\n* RMSE Analysis')
-        rmse = diag_rmse(data, opts.prods)
-        
-        #+++++++++++++++++++++++++++++++#
-        #    Dump diagnostics           #
-        #+++++++++++++++++++++++++++++++#
-        print('\n* Dump diagnostics')        
-        with open(file_outputs, 'wb') as f:
-                pickle.dump((spec, rmse), f)
+        print('\n* Write outputs ')
+        print(file_outputs)
+        write_outputs(file_outputs, mean_rmse_duacs, mean_rmse_da, eff_res_duacs, eff_res_da, opts.prods)
         
 
-
-
-    
-    
-    
-    
+        
+        
