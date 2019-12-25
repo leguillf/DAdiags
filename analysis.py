@@ -132,18 +132,18 @@ if __name__ == '__main__':
         #    Read interpolated fields   #
         #+++++++++++++++++++++++++++++++#
         print('\n* Read interpolated fields')
-        if hasattr(exp, 'lenght_bc'):
-            lenght_bc = exp.lenght_bc
+        if hasattr(comp, 'ncentred'):
+            ncentred = comp.ncentred
         else:
-            print('Warning: argument "lenght_bc" is not defined in experiment config file. Its value is set to 0')
-            lenght_bc = 0
+            print('Warning: argument "ncentred" is not defined in comparison config file. Its value is set to 0')
+            ncentred = 0
         if hasattr(comp, 'time_offset'):
             time_offset = comp.time_offset
         else:
             print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
             time_offset = 0
             
-        data = read_data(comp.path_out+exp.name_experiment, opts.prods, lenght_bc, time_offset)
+        data = read_data(comp.path_out+exp.name_experiment, opts.prods, ncentred, time_offset)
         
         #+++++++++++++++++++++++++++++++#
         #    Spectral Analysis          #
