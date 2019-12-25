@@ -13,12 +13,12 @@ import numpy as np
 from PowerSpec import wavenumber_spectra
 import pickle
 
-def read_data(path_data, prods, bc):
+def read_data(path_data, prods, bc, time_offset):
     
     data = {}
     ncin = nc.Dataset(path_data+'/data_interpolated.nc')
     # Time and grid
-    data['time'] = ncin.variables['time'][:]
+    data['time'] = ncin.variables['time'][time_offset:]
     data['lon'] = ncin.variables['lon'][bc:-(bc+1),bc:-(bc+1)]
     data['lat'] = ncin.variables['lat'][bc:-(bc+1),bc:-(bc+1)]
     # Variables
@@ -26,9 +26,9 @@ def read_data(path_data, prods, bc):
     data['duacs'] = {}
     data['da'] = {}
     for prod in prods:
-        data['ref'][prod] = ncin.variables[prod+'_ref'][:,bc:-(bc+1),bc:-(bc+1)]
-        data['duacs'][prod] = ncin.variables[prod+'_duacs'][:,bc:-(bc+1),bc:-(bc+1)]
-        data['da'][prod] = ncin.variables[prod+'_da'][:,bc:-(bc+1),bc:-(bc+1)]
+        data['ref'][prod] = ncin.variables[prod+'_ref'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
+        data['duacs'][prod] = ncin.variables[prod+'_duacs'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
+        data['da'][prod] = ncin.variables[prod+'_da'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
     
     return data
 
@@ -132,7 +132,18 @@ if __name__ == '__main__':
         #    Read interpolated fields   #
         #+++++++++++++++++++++++++++++++#
         print('\n* Read interpolated fields')
-        data = read_data(comp.path_out+exp.name_experiment, opts.prods, exp.lenght_bc)
+        if hasattr(exp, 'lenght_bc'):
+            lenght_bc = exp.lenght_bc
+        else:
+            print('Warning: argument "lenght_bc" is not defined in experiment config file. Its value is set to 0')
+            lenght_bc = 0
+        if hasattr(comp, 'time_offset'):
+            time_offset = comp.time_offset
+        else:
+            print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
+            time_offset = 0
+            
+        data = read_data(comp.path_out+exp.name_experiment, opts.prods, lenght_bc, time_offset)
         
         #+++++++++++++++++++++++++++++++#
         #    Spectral Analysis          #

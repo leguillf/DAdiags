@@ -145,7 +145,7 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     #    Load products              #
     #+++++++++++++++++++++++++++++++#
-    print('\n* Load products')
+    print('\n* Load products')            
     # NATL60
     print('NATL60')
     ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_natl60ssh(
@@ -163,15 +163,20 @@ if __name__ == '__main__':
     #    Switch var                 #
     #+++++++++++++++++++++++++++++++#   
     print("\n* Switch variables : ", ','.join(opts.prods))
+    if hasattr(exp, 'c'):
+        c = exp.c
+    else:
+        print('Warning: argument "c" is not defined in experiment config file. Its value is set to 2.2')
+        c = 2.2
     # NATL60
     print('NATL60')
-    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,exp.c)
+    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,c)
     # DUACS
     print('DUACS')
-    prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,exp.c)
+    prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c)
     # DA
     print('DA')
-    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,exp.c)
+    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,c)
 
     #+++++++++++++++++++++++++++++++#
     #    Time interpolation         #
