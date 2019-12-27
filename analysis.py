@@ -49,28 +49,28 @@ def ana_spec(data, prods):
         PSD['ref'][prod] = []
         PSD['duacs'][prod] = []
         PSD['da'][prod] = []
-        recScore['duacs'][prod] = []
-        recScore['da'][prod] = []
+        PSD_err_duacs = []
+        PSD_err_da = []
         # Time loop
         for t in range(NT):
             # Compute PSD of the fields and the erros at each timestamp
-            wavenumber, psd2D_ref_t = wavenumber_spectra(data['ref'][prod][t],lon,lat) 
-            wavenumber, psd2D_duacs_t = wavenumber_spectra(data['duacs'][prod][t],lon,lat) 
-            wavenumber, psd2D_da_t = wavenumber_spectra(data['da'][prod][t],lon,lat) 
-            wavenumber, psd2D_err_duacs_t = wavenumber_spectra(data['duacs'][prod][t]-data['ref'][prod][t],lon,lat) 
-            wavenumber, psd2D_err_da_t = wavenumber_spectra(data['da'][prod][t]-data['ref'][prod][t],lon,lat)            
+            wavenumber, psd2D_ref_t = wavenumber_spectra(np.ma.array(data['ref'][prod][t]),lon,lat) 
+            wavenumber, psd2D_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]),lon,lat) 
+            wavenumber, psd2D_da_t = wavenumber_spectra(np.ma.array(data['da'][prod][t]),lon,lat) 
+            wavenumber, psd2D_err_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]-data['ref'][prod][t]),lon,lat) 
+            wavenumber, psd2D_err_da_t = wavenumber_spectra(np.ma.array(data['da'][prod][t]-data['ref'][prod][t]),lon,lat)            
             # Append to list
             PSD['ref'][prod].append(psd2D_ref_t)
             PSD['duacs'][prod].append(psd2D_duacs_t)
             PSD['da'][prod].append(psd2D_da_t)
-            recScore['duacs'][prod].append(psd2D_err_duacs_t)
-            recScore['da'][prod].append(psd2D_err_da_t)                
+            PSD_err_duacs.append(psd2D_err_duacs_t)
+            PSD_err_da.append(psd2D_err_da_t)                
         # Average temporally 
         PSD['ref'][prod] = np.mean(PSD['ref'][prod],axis=0)
         PSD['duacs'][prod] = np.mean(PSD['duacs'][prod],axis=0)
         PSD['da'][prod] = np.mean(PSD['da'][prod],axis=0)
-        recScore['duacs'][prod] = 1 - np.mean(recScore['duacs'][prod],axis=0)/np.mean(PSD['ref'][prod],axis=0)
-        recScore['da'][prod] = 1 - np.mean(recScore['da'][prod],axis=0)/np.mean(PSD['ref'][prod],axis=0)
+        recScore['duacs'][prod] = 1 - np.mean(PSD_err_duacs,axis=0) / PSD['ref'][prod]
+        recScore['da'][prod] = 1 - np.mean(PSD_err_da,axis=0) / PSD['ref'][prod]
 
     return {'wavenumber':wavenumber,'PSD':PSD, 'recScore':recScore}
 
