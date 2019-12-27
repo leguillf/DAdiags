@@ -12,8 +12,7 @@ import pickle
 import os                                  
 from math import cos, pi 
 
-def ssh2multiple(ssh,lon,lat,varnames,c=2.5):
-    name_grd = 'tmp_grd'
+def ssh2multiple(ssh,lon,lat,varnames,c=2.5,name_grd=None):
     var_list = []
     for var in varnames:
         if var=='ssh':

@@ -170,13 +170,13 @@ if __name__ == '__main__':
         c = 2.2
     # NATL60
     print('NATL60')
-    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,c)
+    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,c,name_grd='grid_'+exp.name_experiment)
     # DUACS
     print('DUACS')
-    prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c)
+    prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c,name_grd='grid_'+exp.name_experiment)
     # DA
     print('DA')
-    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,c)
+    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,c,name_grd='grid_'+exp.name_experiment)
 
     #+++++++++++++++++++++++++++++++#
     #    Time interpolation         #
