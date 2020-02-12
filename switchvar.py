@@ -44,17 +44,18 @@ def ssh2pv(ssh,lon,lat,c,name_grd=None,xac=None):
             with open(name_grd, 'rb') as f:
                grd = pickle.load(f)
         else:
-            grd = grid(lon,lat)
+            grd = grid(lon,lat,data=ssh)
             with open(name_grd, 'wb') as f:
                pickle.dump(grd, f)
                f.close()
     else: 
-        grd = grid(lon,lat)   
+        grd = grid(lon,lat,data=ssh)   
 
     f0 = grd.f0
     g = grd.g 
     # Initialization
     pv = np.zeros_like(ssh)    
+    
     if len(ssh.shape) == 2: # One map
         # Compute relative vorticity
         #pv = factor*laplacian(ssh,dx,dy) - g*f0/(c**2) * ssh 
@@ -63,6 +64,13 @@ def ssh2pv(ssh,lon,lat,c,name_grd=None,xac=None):
                      - g*f0[1:-1,1:-1]/(c**2) * ssh[1:-1,1:-1] 
         if xac is not None:
             pv = _masked_edge(pv,xac)       
+            
+        ind=np.where((grd.mask==1))
+        pv[ind]=- g*grd.f0[ind]/(grd.c[ind]**2) *ssh[ind]
+        
+        ind=np.where((grd.mask==0))
+        pv[ind]=0
+        
     elif len(ssh.shape) ==3: # Time serie of maps (or multiple layer)
         NT = ssh.shape[0]
         for t in range(NT):            
@@ -73,9 +81,18 @@ def ssh2pv(ssh,lon,lat,c,name_grd=None,xac=None):
                                       + (ssh_t[1:-1,2:]+ssh_t[1:-1,:-2]-2*ssh_t[1:-1,1:-1])/grd.dx[1:-1,1:-1]**2) \
                      - g*f0[1:-1,1:-1]/(c**2) * ssh_t[1:-1,1:-1] 
             if xac is not None:
-                pv[t] = _masked_edge(pv[t],xac)   
+                pv[t] = _masked_edge(pv[t],xac)  
                 
+                
+            ind=np.where((grd.mask==1))
+            pv[t][ind]=- g*grd.f0[ind]/(grd.c[ind]**2) *ssh[ind]
+            
+            ind=np.where((grd.mask==0))
+            pv[t][ind]=0
+               
     return pv  
+
+
 
 def ssh2uv(ssh,lon,lat,name_grd=None,xac=None):
     if name_grd is not None:
@@ -85,12 +102,12 @@ def ssh2uv(ssh,lon,lat,name_grd=None,xac=None):
             with open(name_grd, 'rb') as f:
                grd = pickle.load(f)
         else:
-            grd = grid(lon,lat)
+            grd = grid(lon,lat,data=ssh)
             with open(name_grd, 'wb') as f:
                pickle.dump(grd, f)
                f.close()
     else: 
-        grd = grid(lon,lat)
+        grd = grid(lon,lat,data=ssh)
     g = grd.g    
 
     # Initialization
@@ -102,7 +119,11 @@ def ssh2uv(ssh,lon,lat,name_grd=None,xac=None):
         v[1:-1,1:-1] = 0.5*g/grd.f0[1:-1,1:-1]*(ssh[1:-1,2:] - ssh[1:-1,:-2]) / grd.dx[1:-1,1:-1]
         if xac is not None:
             u = _masked_edge(u,xac)       
-            v = _masked_edge(v,xac)       
+            v = _masked_edge(v,xac)   
+            
+        u[np.where((np.isnan(u)))]=0
+        v[np.where((np.isnan(v)))]=0
+    
     elif len(ssh.shape) ==3: # Time serie of maps (or multiple layer)
         NT = ssh.shape[0]
         for t in range(NT):            
@@ -112,7 +133,13 @@ def ssh2uv(ssh,lon,lat,name_grd=None,xac=None):
             v[t,1:-1,1:-1] = 0.5*g/grd.f0[1:-1,1:-1]*(ssh_t[1:-1,2:] - ssh_t[1:-1,:-2]) / grd.dx[1:-1,1:-1]
             if xac is not None:
                 u[t] = _masked_edge(u[t],xac)           
-                v[t] = _masked_edge(v[t],xac)  
+                v[t] = _masked_edge(v[t],xac) 
+            
+            u[t][np.where((np.isnan(u)))]=0
+            v[t][np.where((np.isnan(v)))]=0
+                
+    
+
 
     return u,v  
     
@@ -124,12 +151,12 @@ def ssh2rv(ssh,lon,lat,name_grd=None,xac=None):
             with open(name_grd, 'rb') as f:
                grd = pickle.load(f)
         else:
-            grd = grid(lon,lat)
+            grd = grid(lon,lat,data=ssh)
             with open(name_grd, 'wb') as f:
                pickle.dump(grd, f)
                f.close()
     else: 
-        grd = grid(lon,lat)
+        grd = grid(lon,lat,data=ssh)
         
     g = grd.g
 
@@ -142,6 +169,13 @@ def ssh2rv(ssh,lon,lat,name_grd=None,xac=None):
                                       + (ssh[1:-1,2:]+ssh[1:-1,:-2]-2*ssh[1:-1,1:-1])/grd.dx[1:-1,1:-1]**2) 
         if xac is not None:
             rv = _masked_edge(rv,xac)       
+            
+        ind=np.where((grd.mask==1))
+        rv[ind]=- g*grd.f0[ind]/(grd.c[ind]**2) *ssh[ind]
+        
+        ind=np.where((grd.mask==0))
+        rv[ind]=0
+        
     elif len(ssh.shape) ==3: # Time serie of maps (or multiple layer)
         NT = ssh.shape[0]
         for t in range(NT):            
@@ -151,7 +185,14 @@ def ssh2rv(ssh,lon,lat,name_grd=None,xac=None):
             rv[t,1:-1,1:-1]=g/grd.f0[1:-1,1:-1]*((ssh_t[2:,1:-1]+ssh_t[:-2,1:-1]-2*ssh_t[1:-1,1:-1])/grd.dy[1:-1,1:-1]**2 \
                                       + (ssh_t[1:-1,2:]+ssh_t[1:-1,:-2]-2*ssh_t[1:-1,1:-1])/grd.dx[1:-1,1:-1]**2) 
             if xac is not None:
-                rv[t] = _masked_edge(rv[t],xac)        
+                rv[t] = _masked_edge(rv[t],xac)      
+                
+            ind=np.where((grd.mask==1))
+            rv[t][ind]=0
+            
+            ind=np.where((grd.mask==0))
+            rv[t][ind]=0
+            
     return rv  
 
 
@@ -163,18 +204,17 @@ def uv2rv(UV,lon,lat,name_grd=None,xac=None):
             with open(name_grd, 'rb') as f:
                grd = pickle.load(f)
         else:
-            grd = grid(lon,lat)
+            grd = grid(lon,lat,data=UV[0])
             with open(name_grd, 'wb') as f:
                pickle.dump(grd, f)
                f.close()
     else: 
-        grd = grid(lon,lat)
+        grd = grid(lon,lat,data=UV[0])
     dx = grd.dx
     dy = grd.dy
         
     # Initialization
     u = UV[0]
-    mask = np.isnan(u)
     v = UV[1]
     rv = np.zeros_like(u)
     if len(u.shape) == 2: # One map
@@ -190,11 +230,11 @@ def uv2rv(UV,lon,lat,name_grd=None,xac=None):
             rv[t] = _gradj(v_t)/dx - _gradi(u_t)/dy 
             if xac is not None:
                 rv[t] = _masked_edge(rv[t],xac)
-    rv[mask] = np.nan
+    rv[np.isnan(rv)] = 0
     
     return rv 
 
-def pv2ssh(lon,lat,q,hg,c,nitr=1,name_grd=''):
+def pv2ssh(lon,lat,q,hg,c,nitr=1,name_grd=None):
     """ Q to SSH
     
     This code solve a linear system of equations using Conjugate Gradient method
@@ -216,17 +256,20 @@ def pv2ssh(lon,lat,q,hg,c,nitr=1,name_grd=''):
         return avec,
     if name_grd is not None:
         # Grid
-        name_grd += '_switchvar_pv2ssh'
+        if type(c) is not float:
+            _c = c[0,0]
+        else: _c = c
+        name_grd += '_switchvar_pv_' + str(_c) 
         if os.path.isfile(name_grd):   
             with open(name_grd, 'rb') as f:
                grd = pickle.load(f)
         else:
-            grd = grid(lon,lat,c=c)
+            grd = grid(lon,lat,data=hg,c=c)
             with open(name_grd, 'wb') as f:
                pickle.dump(grd, f)
                f.close()
     else: 
-        grd = grid(lon,lat)        
+        grd = grid(lon,lat,data=hg,c=c)        
         
     ny,nx,=np.shape(hg)
     g=grd.g
@@ -290,15 +333,114 @@ def pv2ssh(lon,lat,q,hg,c,nitr=1,name_grd=''):
     return h
 
 
+def rv2ssh(lon,lat,q,hg,nitr=1,name_grd=None):
+    """ Q to SSH
+    
+    This code solve a linear system of equations using Conjugate Gradient method
+
+    Args:
+        q (2D array): Potential Vorticity field
+        hg (2D array): SSH guess
+        grd (Grid() object): check modgrid.py
+
+    Returns:
+        h (2D array): SSH field. 
+    """
+    def compute_avec(vec,aaa,grd):
+    
+        avec=np.empty(grd.np0,) 
+        avec[grd.vp2]=aaa[grd.vp2]*((vec[grd.vp2e]+vec[grd.vp2w]-2*vec[grd.vp2])/(grd.dx1d[grd.vp2]**2)+(vec[grd.vp2n]+vec[grd.vp2s]-2*vec[grd.vp2])/(grd.dy1d[grd.vp2]**2))
+        avec[grd.vp1]=vec[grd.vp1]
+     
+        return avec,
+    if name_grd is not None:
+        # Grid
+        name_grd += '_switchvar_rv' 
+        if os.path.isfile(name_grd):   
+            with open(name_grd, 'rb') as f:
+               grd = pickle.load(f)
+        else:
+            grd = grid(lon,lat,data=hg)
+            with open(name_grd, 'wb') as f:
+               pickle.dump(grd, f)
+               f.close()
+    else: 
+        grd = grid(lon,lat,data=hg)        
+        
+    ny,nx,=np.shape(hg)
+    g=grd.g
+
+
+    x=hg[grd.indi,grd.indj]
+    q1d=q[grd.indi,grd.indj]
+
+    aaa=g/grd.f01d
+    ccc=+q1d
+
+    aaa[grd.vp1]=0
+    ccc[grd.vp1]=x[grd.vp1]  ##boundary condition
+
+    vec=+x
+
+    avec,=compute_avec(vec,aaa,grd)
+    gg=avec-ccc
+    p=-gg
+
+    for itr in range(nitr-1): 
+        vec=+p
+        avec,=compute_avec(vec,aaa,grd)
+        tmp=np.dot(p,avec)
+        
+        if tmp!=0. : s=-np.dot(p,gg)/tmp
+        else: s=1.
+        
+        a1=np.dot(gg,gg)
+        x=x+s*p
+        vec=+x
+        avec,=compute_avec(vec,aaa,grd)
+        gg=avec-ccc
+        a2=np.dot(gg,gg)
+        
+        if a1!=0: beta=a2/a1
+        else: beta=1.
+        
+        p=-gg+beta*p
+    
+    vec=+p
+    avec,=compute_avec(vec,aaa,grd)
+    val1=-np.dot(p,gg)
+    val2=np.dot(p,avec)
+    if (val2==0.): 
+        s=1.
+    else: 
+        s=val1/val2
+
+    a1=np.dot(gg,gg)
+    x=x+s*p
+
+    # back to 2D
+    h=np.empty((ny,nx))
+    h[:,:]=np.NAN
+    h[grd.indi,grd.indj]=x[:]
+
+
+    return h
+
+
 
 class grid():
 
-  def __init__(self,lon,lat, c=None):
+  def __init__(self,lon,lat,data,c=None):
+      
+    if len(data.shape)==3:
+        data = data[0]
     
     ny,nx,=np.shape(lon)
     if c is None:
-        c = 2.7
-
+        c = 2.7*np.ones_like(lon)
+    elif type(c)==float:
+        c *= np.ones_like(lon)
+        
     mask=np.zeros((ny,nx))+2
     mask[:2,:]=1
     mask[:,:2]=1
@@ -315,6 +457,15 @@ class grid():
         dlatx=lat[i,j+1]-lat[i,j]
         dx[i,j]=np.sqrt((dlonx*111000*cos(lat[i,j]*pi/180))**2 + (dlatx*111000)**2)
         dy[i,j]=np.sqrt((dlony*111000*cos(lat[i,j]*pi/180))**2 + (dlaty*111000)**2)
+        if data is not None and (np.isnan(data[i,j])):
+          for p1 in range(-2,3):
+            for p2 in range(-2,3):
+              itest=i+p1
+              jtest=j+p2
+              if ((itest>=0) & (itest<=ny-1) & (jtest>=0) & (jtest<=nx-1)):
+                mask[itest,jtest]=1
+
+
     
     dx[0,:]=dx[1,:]
     dx[-1,:]=dx[-2,:] 
@@ -324,6 +475,8 @@ class grid():
     dy[-1,:]=dy[-2,:] 
     dy[:,0]=dy[:,1]
     dy[:,-1]=dy[:,-2]
+    
+    mask[np.where((np.isnan(data)))]=0
 
     f0=2*2*pi/86164*np.sin(lat*pi/180) 
 
@@ -367,7 +520,7 @@ class grid():
           self.indi[p]=i
           self.indj[p]=j
           self.indp[i,j]=p
-          self.c1d[p]=c
+          self.c1d[p]=c[i,j]
  
  
     p2=-1
