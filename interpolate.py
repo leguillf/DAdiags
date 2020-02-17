@@ -15,6 +15,7 @@ import argparse
 import load
 import switchvar
 import netCDF4 as nc
+from datetime import datetime
 
 
 
@@ -105,7 +106,10 @@ def writeOutputs(path_out,prods_ref,prods_duacs,prods_da,names_prods,datetimes,l
         ncref[:,:,:] = prods_ref[i]
         # DUACS
         ncduacs = ncout.createVariable(name+'_duacs', 'f', ('time','y','x',))  
-        ncduacs[:,:,:] = prods_duacs[i]
+        if prods_duacs is not None:
+            ncduacs[:,:,:] = prods_duacs[i]
+        else:
+            ncduacs[:,:,:] = prods_ref[i]*np.nan
         # DA
         ncda = ncout.createVariable(name+'_da', 'f', ('time','y','x',))  
         ncda[:,:,:] = prods_da[i]
@@ -125,6 +129,8 @@ if __name__ == '__main__':
     parser.add_argument('--path_config_exp', default=None, type=str)     # parameters relative to the DA experiment
     parser.add_argument('--name_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
     parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
+    parser.add_argument('--path_save', default=None, type=str)           # Path where the outputs are saved
+    parser.add_argument('--DUACS', default=True, type=bool)           # Path where the outputs are saved
     opts = parser.parse_args()
     
     #+++++++++++++++++++++++++++++++#
@@ -137,6 +143,10 @@ if __name__ == '__main__':
     sys.path.insert(0,dir_exp)
     exp = __import__(name_exp, globals=globals())
     print(name_exp)
+    if opts.path_save is not None:
+        path_save = opts.path_save
+    else:
+        path_save = exp.path_save
     # parameters relative to NATL60 and DUACS 
     sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
     comp = __import__(opts.name_config_comp, globals=globals())
@@ -146,18 +156,28 @@ if __name__ == '__main__':
     #    Load products              #
     #+++++++++++++++++++++++++++++++#
     print('\n* Load products')            
-    # NATL60
-    print('NATL60')
-    ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_natl60ssh(
+    # Reference
+    print('Reference')
+    if hasattr(comp, 'dt_ref'):
+        dt_ref = comp.dt_ref
+    else:
+        dt_ref = datetime(1958,1,1,0,0,0) # For NATL60
+    ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_Refprods(
             comp.path_reference,comp.file_reference,comp.name_time_reference,comp.name_lon_reference,comp.name_lat_reference,comp.name_var_reference,
-            exp.init_date-exp.propagation_time_step,exp.final_date+exp.propagation_time_step,datetime_type=True)
+            exp.init_date-exp.propagation_time_step,exp.final_date+exp.propagation_time_step,datetime_type=True, dt_ref=dt_ref)
     # DUACS
-    print('DUACS')
-    ssh_duacs, datetime_duacs, lon_duacs, lat_duacs = load.load_DUACSprods(
-            comp.path_duacs,comp.file_duacs,comp.name_time_duacs,comp.name_lon_duacs,comp.name_lat_duacs,comp.name_var_duacs,bounds=[lon_ref.min(),lon_ref.max(),lat_ref.min(),lat_ref.max()])
+    if hasattr(comp, 'path_duacs'):
+        DUACS = True
+    else:
+        print('No DUACS-related parameters --> no diagnostics will be computed')
+        DUACS = False
+    if DUACS:
+        print('DUACS')
+        ssh_duacs, datetime_duacs, lon_duacs, lat_duacs = load.load_DUACSprods(
+                comp.path_duacs,comp.file_duacs,comp.name_time_duacs,comp.name_lon_duacs,comp.name_lat_duacs,comp.name_var_duacs,bounds=[lon_ref.min(),lon_ref.max(),lat_ref.min(),lat_ref.max()])
     # DA experiment
     print('DA')
-    ssh_da, datetime_da, lon_da, lat_da = load.load_DAprods(exp.path_save,exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],exp.init_date,exp.final_date,exp.propagation_time_step,prefixe=exp.name_exp_save)
+    ssh_da, datetime_da, lon_da, lat_da = load.load_DAprods(path_save,exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],exp.init_date,exp.final_date,exp.propagation_time_step,prefixe=exp.name_exp_save)
     
     #+++++++++++++++++++++++++++++++#
     #    Switch var                 #
@@ -168,12 +188,13 @@ if __name__ == '__main__':
     else:
         print('Warning: argument "c" is not defined in experiment config file. Its value is set to 2.2')
         c = 2.2
-    # NATL60
-    print('NATL60')
+    # Reference
+    print('Reference')
     prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,c,name_grd='grid_'+exp.name_experiment)
     # DUACS
-    print('DUACS')
-    prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c,name_grd='grid_'+exp.name_experiment)
+    if DUACS:
+        print('DUACS')
+        prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c,name_grd='grid_'+exp.name_experiment)
     # DA
     print('DA')
     prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,c,name_grd='grid_'+exp.name_experiment)
@@ -183,8 +204,9 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#    
     print('\n* Time interpolation')
     # DUACS
-    print('DUACS')
-    prods_duacs = [interpTime(datetime_duacs,datetime_ref,prod) for prod in prods_duacs]
+    if DUACS:
+        print('DUACS')
+        prods_duacs = [interpTime(datetime_duacs,datetime_ref,prod) for prod in prods_duacs]
     # DA
     print('DA')
     prods_da = [interpTime(datetime_da,datetime_ref,prod) for prod in prods_da]
@@ -194,8 +216,11 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     print('\n* Grid interpolation')
     # DUACS
-    print('DUACS')
-    prods_duacs = [interpGrid((lon_duacs,lat_duacs),(lon_ref,lat_ref),prod) for prod in prods_duacs]
+    if DUACS:
+        print('DUACS')
+        prods_duacs = [interpGrid((lon_duacs,lat_duacs),(lon_ref,lat_ref),prod) for prod in prods_duacs]
+    else:
+        prods_duacs = None
     # DA
     print('DA')
     prods_da = [interpGrid((lon_da,lat_da),(lon_ref,lat_ref),prod) for prod in prods_da]

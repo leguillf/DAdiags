@@ -11,29 +11,37 @@ import netCDF4 as nc
 import numpy as np 
 from datetime import datetime,timedelta
 
-def load_natl60ssh(path,file,name_time,name_lon,name_lat,name_var,dt_start,dt_end,dt_ref=datetime(1958,1,1,0,0,0),datetime_type=True):
+def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,dt_end,dt_ref=datetime(1958,1,1,0,0,0),datetime_type=True):
     """
     NAME 
-        load_natl60ssh
+        load_Refprods
 
     DESCRIPTION
-    
 
-        Args:     
-        for NATL60 : dt_ref=datetime(1958,1,1,0,0,0)
-            
-        Param:
-        
-
+        Args:  
+            directory (string): directory in which the the netcdf file is stored
+            file (string): name of the netcdf file
+            name_time (string): name of time coordinate in the netcdf file
+            name_lon (string): name of longitude coordinate in the netcdf files
+            name_lat (string): name of latitude coordinate in the netcdf files
+            name_var (string): name of the variable (typically ssh) to process in the netcdf files
+            dt_start (datetime object): time of the begining of the analysis window 
+            dt_end (datetime object): time of the end of the analysis window 
+            dt_ref (datetime object): refrence time used in the netcdf file
+            datetime_type (bool): if true, return datetype formatting timestamps
+                
         Returns: 
-        
-
+            var (3D numpy array): fields of the simulation stored in a numpy array
+            dt_out_time (1D numpy array): timestamps of the fields
+            lon (2D numpy array): longitude of the fields
+            lat (2D numpy array): latitude of the fields
     """
+    
     # Compute time boundaries in seconds since dt_ref to be compared to timestamps
     time_sec_min = (dt_start - dt_ref).total_seconds()
     time_sec_max = (dt_end - dt_ref).total_seconds() 
     # Read timestamp and grid
-    ncin = nc.Dataset(path + file)
+    ncin = nc.Dataset(directory + file)
     timestamp = np.array(ncin.variables[name_time][:])  
     lon = np.array(ncin.variables[name_lon][:]) % 360
     lat = np.array(ncin.variables[name_lat][:]) 
@@ -64,15 +72,22 @@ def load_DAprods(directory, name_lon, name_lat, name_var, dt_start, dt_end, dt_t
 
     DESCRIPTION
 
-        Args:     
-        
-            
-        Param:
-        
-
+        Args:  
+            directory (string): directory in which the outputs are stored
+            name_lon (string): name of longitude coordinate in the netcdf files
+            name_lat (string): name of latitude coordinate in the netcdf files
+            name_var (string): name of the variable (typically ssh) to process in the netcdf files
+            dt_start (datetime object): time of the begining of the analysis window 
+            dt_end (datetime object): time of the end of the analysis window 
+            dt_timestep (timedelta object): timestep of the outputs (typically one hour)
+            prefixe (string): specific prefix of the simulation, if several simulations are stored in the same directory
+            suffixe (string): specific suffixe of the simulation, if several simulations are stored in the same directory
+                
         Returns: 
-        
-
+            fields (3D numpy array): fields of the simulation stored in a numpy array
+            datetimes (1D numpy array): timestamps of the fields
+            lon (2D numpy array): longitude of the fields
+            lat (2D numpy array): latitude of the fields
     """
 
     listOfFiles = os.listdir(directory)  
@@ -115,9 +130,33 @@ def load_DAprods(directory, name_lon, name_lat, name_var, dt_start, dt_end, dt_t
 
 
 def load_DUACSprods(directory,file,name_time,name_lon,name_lat,name_ssh,dt_ref_duacs=datetime(1950,1,1,0,0,0),bounds=None):
+    """
+    NAME 
+        load_DUACSprods
+
+    DESCRIPTION
+
+        Args:  
+            directory (string): directory in which the outputs are stored
+            file (string): name of the netcdf file
+            name_time (string): name of time coordinate in the netcdf file
+            name_lon (string): name of longitude coordinate in the netcdf file
+            name_lat (string): name of latitude coordinate in the netcdf file
+            name_ssh (string): name of ssh to process in the netcdf file
+            dt_ref_duacs (datetime object): refrence time used in the netcdf file
+            bounds (list): domain boundaries (optional) to extract the fields
+           
+        Returns: 
+            ssh2d_duacs (3D numpy array): fields of the simulation stored in a numpy array
+            datetimes_duacs (1D numpy array): timestamps of the fields
+            lon2d_duacs (2D numpy array): longitude of the fields
+            lat2d_duacs (2D numpy array): latitude of the fields
+    """
+
     ncin = nc.Dataset(directory + file)
     time_duacs = np.array(ncin.variables[name_time][:]) 
     if 'swot_en_j1_tpn_g2' in file:
+        # Time correction due to a bug in the data processing
         time_duacs += 22919 - 19358
     lon_duacs = np.array(ncin.variables[name_lon][:]) % 360
     lat_duacs = np.array(ncin.variables[name_lat][:]) 
