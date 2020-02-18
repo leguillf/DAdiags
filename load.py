@@ -65,7 +65,7 @@ def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,d
 
 
 
-def load_DAprods(directory, name_lon, name_lat, name_var, dt_start, dt_end, dt_timestep, prefixe = "", suffixe = ""):
+def load_DAprods(directory, name_lon, name_lat, name_var, dt_start, dt_end, dt_timestep, prefixe = "*", suffixe = ""):
     """
     NAME 
         load_DAprods

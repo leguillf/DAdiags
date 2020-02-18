@@ -105,11 +105,9 @@ def writeOutputs(path_out,prods_ref,prods_duacs,prods_da,names_prods,datetimes,l
         ncref = ncout.createVariable(name+'_ref', 'f', ('time','y','x',))  
         ncref[:,:,:] = prods_ref[i]
         # DUACS
-        ncduacs = ncout.createVariable(name+'_duacs', 'f', ('time','y','x',))  
         if prods_duacs is not None:
+            ncduacs = ncout.createVariable(name+'_duacs', 'f', ('time','y','x',))  
             ncduacs[:,:,:] = prods_duacs[i]
-        else:
-            ncduacs[:,:,:] = prods_ref[i]*np.nan
         # DA
         ncda = ncout.createVariable(name+'_da', 'f', ('time','y','x',))  
         ncda[:,:,:] = prods_da[i]
@@ -130,7 +128,6 @@ if __name__ == '__main__':
     parser.add_argument('--name_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
     parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--path_save', default=None, type=str)           # Path where the outputs are saved
-    parser.add_argument('--DUACS', default=True, type=bool)           # Path where the outputs are saved
     opts = parser.parse_args()
     
     #+++++++++++++++++++++++++++++++#

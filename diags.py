@@ -12,41 +12,37 @@ import numpy as np
 from scipy import interpolate
 import pickle
 
-def compute_mean_rmse(rmse, prods):
+def compute_mean_rmse(rmse, prods, name):
     
-    mean_rmse_duacs = [] 
-    mean_rmse_da = []
+    mean_rmse = [] 
     rmse_data = rmse['RMSE']
     for prod in prods:
-        mean_rmse_duacs.append(np.mean(rmse_data['duacs'][prod]))
-        mean_rmse_da.append(np.mean(rmse_data['da'][prod]))
+        mean_rmse.append(np.mean(rmse_data[name][prod]))
         
-    return mean_rmse_duacs, mean_rmse_da
+    return mean_rmse
 
-def compute_eff_res(spec, prods):
+def compute_eff_res(spec, prods, name, r=0.5):
     
-    eff_res_duacs = []
-    eff_res_da = []
+    eff_res = []
     wavenumber = spec['wavenumber'] *1e3  # in cycle/km
     recScore_data = spec['recScore']
     for prod in prods:
-        f_duacs = interpolate.interp1d(recScore_data['duacs'][prod], 1/wavenumber, axis=0)   
-        eff_res_duacs.append(f_duacs(0.5))
-        f_da = interpolate.interp1d(recScore_data['da'][prod], 1/wavenumber, axis=0)   
-        eff_res_da.append(f_da(0.5))
+        f = interpolate.interp1d(recScore_data[name][prod], 1/wavenumber, axis=0)   
+        eff_res.append(f(r))
         
-    return eff_res_duacs, eff_res_da
+    return eff_res
 
 def write_outputs(file,mean_rmse_duacs,mean_rmse_da,eff_res_duacs,eff_res_da, prods):
     f = open(file,'w')
     # DUACS
-    f.write('DUACS\n')
-    f.write('\t RMSE:\n' )
-    for i,prod in enumerate(prods):
-        f.write('\t\t' + prod + ': ' + "{:.3E}".format(mean_rmse_duacs[i]) + '\n') 
-    f.write('\t Eff Res:\n' )
-    for i,prod in enumerate(prods):
-        f.write('\t\t' + prod + ': ' + "{:.3E}".format(eff_res_duacs[i]) + '\n')            
+    if mean_rmse_duacs is not None and eff_res_duacs is not None:
+        f.write('DUACS\n')
+        f.write('\t RMSE:\n' )
+        for i,prod in enumerate(prods):
+            f.write('\t\t' + prod + ': ' + "{:.3E}".format(mean_rmse_duacs[i]) + '\n') 
+        f.write('\t Eff Res:\n' )
+        for i,prod in enumerate(prods):
+            f.write('\t\t' + prod + ': ' + "{:.3E}".format(eff_res_duacs[i]) + '\n')            
     # DA
     f.write('\nDA\n')
     f.write('\t RMSE:\n' )
@@ -95,6 +91,12 @@ if __name__ == '__main__':
     else:
         if opts.overwrite==1: 
             print('Warning:', file_outputs, 'already exists but you ask to overwrite it')
+        # DUACS
+        if hasattr(comp, 'path_duacs'):
+            DUACS = True
+        else:
+            print('No DUACS-related parameters --> no diagnostics will be computed')
+            DUACS = False
         #+++++++++++++++++++++++++++++++#
         #    Read analysis              #
         #+++++++++++++++++++++++++++++++#
@@ -106,17 +108,20 @@ if __name__ == '__main__':
         #    Evaluate metrics           #
         #+++++++++++++++++++++++++++++++#
         print('\n* Evaluate metrics ')
-        mean_rmse_duacs, mean_rmse_da = compute_mean_rmse(rmse, opts.prods)
-        print(mean_rmse_duacs, mean_rmse_da)
-        eff_res_duacs, eff_res_da = compute_eff_res(spec, opts.prods)
-        print(eff_res_duacs, eff_res_da)
+        mean_rmse_da = compute_mean_rmse(rmse, opts.prods, name='da')
+        eff_res_da = compute_eff_res(spec, opts.prods, name='da')
+        if DUACS:
+            mean_rmse_duacs = compute_mean_rmse(rmse, opts.prods, name='duacs')
+            eff_res_duacs = compute_eff_res(spec, opts.prods, name='duacs')
+        else:
+            mean_rmse_duacs = eff_res_duacs = None
         
         #+++++++++++++++++++++++++++++++#
         #    Write outputs              #
         #+++++++++++++++++++++++++++++++#
         print('\n* Write outputs ')
         print(file_outputs)
-        write_outputs(file_outputs, mean_rmse_duacs, mean_rmse_da, eff_res_duacs, eff_res_da, opts.prods)
+        write_outputs(file_outputs, mean_rmse_duacs,mean_rmse_da,eff_res_duacs,eff_res_da, opts.prods)
         
 
         

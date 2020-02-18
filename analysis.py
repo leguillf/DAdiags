@@ -13,7 +13,7 @@ import numpy as np
 from PowerSpec import wavenumber_spectra
 import pickle
 
-def read_data(path_data, prods, bc, time_offset):
+def read_data(path_data, prods, bc, time_offset,DUACS=True):
     
     data = {}
     ncin = nc.Dataset(path_data+'/data_interpolated.nc')
@@ -23,21 +23,27 @@ def read_data(path_data, prods, bc, time_offset):
     data['lat'] = ncin.variables['lat'][bc:-(bc+1),bc:-(bc+1)]
     # Variables
     data['ref'] = {}
-    data['duacs'] = {}
+    if DUACS:
+        data['duacs'] = {}
     data['da'] = {}
     for prod in prods:
         data['ref'][prod] = ncin.variables[prod+'_ref'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
-        data['duacs'][prod] = ncin.variables[prod+'_duacs'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
+        if DUACS:
+            data['duacs'][prod] = ncin.variables[prod+'_duacs'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
         data['da'][prod] = ncin.variables[prod+'_da'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
     
     return data
 
 
 
-def ana_spec(data, prods):
+def ana_spec(data, prods,DUACS=True):
     
-    PSD = {'ref':{},'duacs':{},'da':{}}
-    recScore = {'duacs':{},'da':{}}
+    if DUACS:
+        PSD = {'ref':{},'duacs':{},'da':{}}
+        recScore = {'duacs':{},'da':{}}
+    else:
+        PSD = {'ref':{},'da':{}}
+        recScore = {'da':{}}
     
     NT = data['time'].size
     lon = data['lon']
@@ -47,7 +53,8 @@ def ana_spec(data, prods):
     for prod in prods:
         # Initialize lists
         PSD['ref'][prod] = []
-        PSD['duacs'][prod] = []
+        if DUACS:
+            PSD['duacs'][prod] = []
         PSD['da'][prod] = []
         PSD_err_duacs = []
         PSD_err_da = []
@@ -55,21 +62,24 @@ def ana_spec(data, prods):
         for t in range(NT):
             # Compute PSD of the fields and the erros at each timestamp
             wavenumber, psd2D_ref_t = wavenumber_spectra(np.ma.array(data['ref'][prod][t]),lon,lat) 
-            wavenumber, psd2D_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]),lon,lat) 
-            wavenumber, psd2D_da_t = wavenumber_spectra(np.ma.array(data['da'][prod][t]),lon,lat) 
-            wavenumber, psd2D_err_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]-data['ref'][prod][t]),lon,lat) 
+            if DUACS:
+                wavenumber, psd2D_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]),lon,lat) 
+                wavenumber, psd2D_err_duacs_t = wavenumber_spectra(np.ma.array(data['duacs'][prod][t]-data['ref'][prod][t]),lon,lat) 
+            wavenumber, psd2D_da_t = wavenumber_spectra(np.ma.array(data['da'][prod][t]),lon,lat)             
             wavenumber, psd2D_err_da_t = wavenumber_spectra(np.ma.array(data['da'][prod][t]-data['ref'][prod][t]),lon,lat)            
             # Append to list
             PSD['ref'][prod].append(psd2D_ref_t)
-            PSD['duacs'][prod].append(psd2D_duacs_t)
+            if DUACS:
+                PSD['duacs'][prod].append(psd2D_duacs_t)
             PSD['da'][prod].append(psd2D_da_t)
             PSD_err_duacs.append(psd2D_err_duacs_t)
             PSD_err_da.append(psd2D_err_da_t)                
         # Average temporally 
         PSD['ref'][prod] = np.mean(PSD['ref'][prod],axis=0)
-        PSD['duacs'][prod] = np.mean(PSD['duacs'][prod],axis=0)
-        PSD['da'][prod] = np.mean(PSD['da'][prod],axis=0)
-        recScore['duacs'][prod] = 1 - np.mean(PSD_err_duacs,axis=0) / PSD['ref'][prod]
+        if DUACS:
+            PSD['duacs'][prod] = np.mean(PSD['duacs'][prod],axis=0)
+            recScore['duacs'][prod] = 1 - np.mean(PSD_err_duacs,axis=0) / PSD['ref'][prod]
+        PSD['da'][prod] = np.mean(PSD['da'][prod],axis=0)        
         recScore['da'][prod] = 1 - np.mean(PSD_err_da,axis=0) / PSD['ref'][prod]
 
     return {'wavenumber':wavenumber,'PSD':PSD, 'recScore':recScore}
@@ -77,13 +87,16 @@ def ana_spec(data, prods):
 
 
 
-def ana_rmse(data, prods):
-    
-    RMSE = {'duacs':{},'da':{}}
+def ana_rmse(data, prods, DUACS=True):
+    if DUACS:
+        RMSE = {'duacs':{},'da':{}}
+    else:
+        RMSE = {'da':{}}
     
     for prod in prods:  
-        NT,NY,NX = data['ref'][prod].shape          
-        RMSE['duacs'][prod] = [np.sqrt(np.sum(np.sum(np.square(data['duacs'][prod][t,:,:]-data['ref'][prod][t,:,:])))/NY/NX) for t in range(NT)]
+        NT,NY,NX = data['ref'][prod].shape   
+        if DUACS:
+            RMSE['duacs'][prod] = [np.sqrt(np.sum(np.sum(np.square(data['duacs'][prod][t,:,:]-data['ref'][prod][t,:,:])))/NY/NX) for t in range(NT)]
         RMSE['da'][prod] = [np.sqrt(np.sum(np.sum(np.square(data['da'][prod][t,:,:]-data['ref'][prod][t,:,:])))/NY/NX) for t in range(NT)]
         
     return {'time':data['time'], 'RMSE':RMSE}
@@ -131,6 +144,12 @@ if __name__ == '__main__':
         #+++++++++++++++++++++++++++++++#
         #    Read interpolated fields   #
         #+++++++++++++++++++++++++++++++#
+        # DUACS
+        if hasattr(comp, 'path_duacs'):
+            DUACS = True
+        else:
+            print('No DUACS-related parameters --> no diagnostics will be computed')
+            DUACS = False
         print('\n* Read interpolated fields')
         if hasattr(comp, 'ncentred'):
             ncentred = comp.ncentred
@@ -143,19 +162,19 @@ if __name__ == '__main__':
             print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
             time_offset = 0
             
-        data = read_data(comp.path_out+exp.name_experiment, opts.prods, ncentred, time_offset)
+        data = read_data(comp.path_out+exp.name_experiment, opts.prods, ncentred, time_offset, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    Spectral Analysis          #
         #+++++++++++++++++++++++++++++++#
         print('\n* Spectral Analysis')
-        spec = ana_spec(data, opts.prods)
+        spec = ana_spec(data, opts.prods, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    RMSE Analysis              #
         #+++++++++++++++++++++++++++++++#
         print('\n* RMSE Analysis')
-        rmse = ana_rmse(data, opts.prods)
+        rmse = ana_rmse(data, opts.prods, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    Dump Analysis              #
