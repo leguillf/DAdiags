@@ -135,8 +135,8 @@ def ssh2uv(ssh,lon,lat,name_grd=None,xac=None):
                 u[t] = _masked_edge(u[t],xac)           
                 v[t] = _masked_edge(v[t],xac) 
             
-            u[t][np.where((np.isnan(u)))]=0
-            v[t][np.where((np.isnan(v)))]=0
+            u[t][np.where((np.isnan(u[t])))]=0
+            v[t][np.where((np.isnan(v[t])))]=0
                 
     
 
