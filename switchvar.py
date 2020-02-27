@@ -563,7 +563,7 @@ def _masked_edge(var, xac):
     else:
         ind_edge_swath_gap = np.transpose((xac==np.nanmax(xac[xac<0])))
 
-    var[ind_edge_swath] = np.nan
+    var[ind_edge_swath_gap] = np.nan
 
     return var
 
