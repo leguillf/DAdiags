@@ -8,10 +8,11 @@ Created on Wed Dec 18 14:22:18 2019
 
 import os, fnmatch
 import netCDF4 as nc
+import xarray as xr
 import numpy as np 
 from datetime import datetime,timedelta
 
-def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,dt_end,dt_ref=datetime(1958,1,1,0,0,0),datetime_type=True):
+def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,dt_end,dt_ref=datetime(1958,1,1,0,0,0),datetime_type=True,timestep=1):
     """
     NAME 
         load_Refprods
@@ -41,15 +42,20 @@ def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,d
     time_sec_min = (dt_start - dt_ref).total_seconds()
     time_sec_max = (dt_end - dt_ref).total_seconds() 
     # Read timestamp and grid
-    ncin = nc.Dataset(directory + file)
-    timestamp = np.array(ncin.variables[name_time][:])  
-    lon = np.array(ncin.variables[name_lon][:]) % 360
-    lat = np.array(ncin.variables[name_lat][:]) 
+    ds = xr.open_mfdataset(directory + file, decode_times=False, combine='nested',concat_dim=name_time)
+    timestamp = ds[name_time][:].values
+    lon = ds[name_lon][:].values % 360
+    lat = ds[name_lat][:].values
+
+    if len(lon.shape)==3:
+        lon = lon[0,:,:]
+        lat = lat[0,:,:]
+
     # Find time indexes corresponding to the time boundaries
     idx_time = (timestamp >= time_sec_min) & (timestamp <= time_sec_max)
-    out_time = ncin.variables[name_time][idx_time]
+    out_time = ds[name_time][idx_time][::timestep].values
     # Read variable 
-    var = np.array(ncin.variables[name_var][idx_time,:,:]) 
+    var = ds[name_var][idx_time,:,:][::timestep].values
     
     var[var<=-50] = 0.
     # Compute datetimes corresponding to the indexes found

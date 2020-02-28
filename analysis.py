@@ -62,14 +62,22 @@ def ana_spec(data, prods,DUACS=True,r=0.5):
             PSD['duacs'][prod] = ana_compute_spec(data['duacs'][prod].values,lon,lat)[1]
             PSD_err_duacs = ana_compute_spec(data['duacs'][prod]-data['ref'][prod].values,lon,lat)[1]
             Score['duacs'][prod] = 1 - PSD_err_duacs / PSD_ref
-            f = interpolate.interp1d(Score['duacs'][prod], 1/wavenumber, axis=0)   
-            Num['duacs'][prod] = f(r)
+            f = interpolate.interp1d(Score['duacs'][prod], 1/wavenumber, axis=0)  
+            if np.max(Score['duacs'][prod])>r and np.min(Score['duacs'][prod])<r:
+                Num['duacs'][prod] = f(r)
+            else:
+                Num['duacs'][prod] = np.nan
+
         PSD['da'][prod] = ana_compute_spec(data['da'][prod].values,lon,lat)[1]
         PSD_err_da = ana_compute_spec(data['da'][prod].values-data['ref'][prod].values,lon,lat)[1]
         Score['da'][prod] = 1 - PSD_err_da / PSD_ref
         
         f = interpolate.interp1d(Score['da'][prod], 1/wavenumber, axis=0)   
-        Num['da'][prod] = f(r)
+        if np.max(Score['da'][prod])>r and np.min(Score['da'][prod])<r:
+            Num['da'][prod] = f(r)
+        else:
+            Num['da'][prod] = np.nan
+
 
     return {'wavenumber':wavenumber, 'PSD':PSD, 'Score':Score, 'Num':Num}
 

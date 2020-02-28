@@ -63,7 +63,7 @@ def interpGrid(grid_in, grid_out, fields_in,interp='cubic'):
         fields_out
 
     """
-    if (np.all(grid_in == grid_out)):
+    if (np.all(grid_in[0] == grid_out[0])) and (np.all(grid_in[1] == grid_out[1])) : 
         print("The grid are identical, no need to interpolate")
         return fields_in
     
@@ -159,9 +159,15 @@ if __name__ == '__main__':
         dt_ref = comp.dt_ref
     else:
         dt_ref = datetime(1958,1,1,0,0,0) # For NATL60
+
+    if hasattr(comp,'timestep_ref'):
+        timestep = comp.timestep_ref
+    else:
+        timestep = 1 
+
     ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_Refprods(
             comp.path_reference,comp.file_reference,comp.name_time_reference,comp.name_lon_reference,comp.name_lat_reference,comp.name_var_reference,
-            exp.init_date-exp.propagation_time_step,exp.final_date+exp.propagation_time_step,datetime_type=True, dt_ref=dt_ref)
+            exp.init_date,exp.final_date,datetime_type=True, dt_ref=dt_ref, timestep=timestep)
     # DUACS
     if hasattr(comp, 'path_duacs'):
         DUACS = True
@@ -174,7 +180,7 @@ if __name__ == '__main__':
                 comp.path_duacs,comp.file_duacs,comp.name_time_duacs,comp.name_lon_duacs,comp.name_lat_duacs,comp.name_var_duacs,bounds=[lon_ref.min(),lon_ref.max(),lat_ref.min(),lat_ref.max()])
     # DA experiment
     print('DA')
-    ssh_da, datetime_da, lon_da, lat_da = load.load_DAprods(path_save,exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],exp.init_date,exp.final_date,exp.propagation_time_step,prefixe=exp.name_exp_save)
+    ssh_da, datetime_da, lon_da, lat_da = load.load_DAprods(path_save,exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],exp.init_date,exp.final_date,exp.saveoutput_time_step,prefixe=exp.name_exp_save)
     
     #+++++++++++++++++++++++++++++++#
     #    Switch var                 #
