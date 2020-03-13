@@ -234,15 +234,25 @@ def compute_wk(data,lon,lat):
 ##======================================================================================================================##
 
 if __name__ == '__main__':
+    
+    
     #+++++++++++++++++++++++++++++++#
-    #    _#
+    #    Parsing                    #
     #+++++++++++++++++++++++++++++++#
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)        # parameters relative to the DA experiment
     parser.add_argument('--name_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
     parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--overwrite', default=1, type=int)
-    parser.add_argument('--name_exp', default=None, type=str)               # Name of the DA experiment. Useless if path_config_exp is specified
+    # optional parameters that have to be provided if *path_config_exp* is not provided
+    parser.add_argument('--name_exp', default=None, type=str)               
+    # optional parameters that have to be provided if *name_config_comp* is not provided
+    parser.add_argument('--path_out', default=None, type=str)   
+    parser.add_argument('--ncentred', default=0, type=int)  
+    parser.add_argument('--time_offset', default=0, type=int)  
+    parser.add_argument('--DUACS', default=False, type=bool)  
+    
+    # Parsing
     opts = parser.parse_args()
         
     #+++++++++++++++++++++++++++++++#
@@ -263,14 +273,37 @@ if __name__ == '__main__':
         exp = __import__(file_exp, globals=globals())
         name_exp = exp.name_experiment
         
-    # parameters relative to NATL60 and DUACS 
-    sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
-    comp = __import__(opts.name_config_comp, globals=globals())
+    # parameters relative to comparison
+    if opts.name_config_comp is None:
+        if opts.path_out is not None:
+            path_out = opts.path_out
+            ncentred = opts.ncentred
+            time_offset = opts.time_offset
+            DUACS = opts.DUACS
+        else:
+            print('Error: either name_config_comp or path_out has to be specified')
+            sys.exit()            
+    else:           
+        sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
+        comp = __import__(opts.name_config_comp, globals=globals())
+        path_out = comp.path_out
+        if hasattr(comp, 'path_duacs'):
+            DUACS = True
+        else:
+            print('No DUACS-related parameters --> no comparison with DUACS will be performed')
+        if hasattr(comp, 'ncentred'):
+            ncentred = comp.ncentred
+        else:
+            print('Warning: argument "ncentred" is not defined in comparison config file. Its value is set to 0')
+        if hasattr(comp, 'time_offset'):
+            time_offset = comp.time_offset
+        else:
+            print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
     
     #+++++++++++++++++++++++++++++++#
     #    Analysis                   #
     #+++++++++++++++++++++++++++++++#
-    file_outputs = comp.path_out+name_exp +'/analysis.pic'
+    file_outputs = path_out+name_exp +'/analysis.pic'
     if os.path.isfile(file_outputs) and opts.overwrite!=1: 
         print(file_outputs, 'already exists')
     else:
@@ -279,25 +312,8 @@ if __name__ == '__main__':
         #+++++++++++++++++++++++++++++++#
         #    Read interpolated fields   #
         #+++++++++++++++++++++++++++++++#
-        # DUACS
-        if hasattr(comp, 'path_duacs'):
-            DUACS = True
-        else:
-            print('No DUACS-related parameters --> no diagnostics will be computed')
-            DUACS = False
         print('\n* Read interpolated fields')
-        if hasattr(comp, 'ncentred'):
-            ncentred = comp.ncentred
-        else:
-            print('Warning: argument "ncentred" is not defined in comparison config file. Its value is set to 0')
-            ncentred = 0
-        if hasattr(comp, 'time_offset'):
-            time_offset = comp.time_offset
-        else:
-            print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
-            time_offset = 0
-            
-        data = read_data(comp.path_out+name_exp, opts.prods, ncentred, time_offset, DUACS=DUACS)
+        data = read_data(path_out+name_exp, opts.prods, ncentred, time_offset, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    RMSE Analysis              #
@@ -316,8 +332,6 @@ if __name__ == '__main__':
         #+++++++++++++++++++++++++++++++#
         print('\n* WK Analysis')
         wk = ana_wk(data, opts.prods, DUACS=DUACS)
-        
-        
         
         #+++++++++++++++++++++++++++++++#
         #    Dump Analysis              #
