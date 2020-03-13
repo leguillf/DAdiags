@@ -291,14 +291,17 @@ if __name__ == '__main__':
             DUACS = True
         else:
             print('No DUACS-related parameters --> no comparison with DUACS will be performed')
+            DUACS = False
         if hasattr(comp, 'ncentred'):
             ncentred = comp.ncentred
         else:
             print('Warning: argument "ncentred" is not defined in comparison config file. Its value is set to 0')
+            ncentred = 0
         if hasattr(comp, 'time_offset'):
             time_offset = comp.time_offset
         else:
             print('Warning: argument "time_offset" is not defined in experiment config file. Its value is set to 0')
+            time_offset = 0
     
     #+++++++++++++++++++++++++++++++#
     #    Analysis                   #

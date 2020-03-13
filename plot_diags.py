@@ -13,7 +13,8 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pylab as plt
 import numpy as np
 from analysis import ana_compute_rmse
-
+import matplotlib
+matplotlib.use('Agg')
 
 
 def diag_multiple_DAfields_comp(refField,expField,lon2d,lat2d,dt_curr,RMSE=None,itime=0,name_RefFields='True state',name_DAfields=None,prefixe='',var='SSH',name_var=None,ncentred=None,var_range=None,cmap='RdBu_r',save=False,path_save=None,plot_err_from_ref=False, xlabel='time (days)',ylabel='RMSE',gdtr_obs=None):
@@ -359,6 +360,9 @@ if __name__ == '__main__':
     #    Plot                       #
     #+++++++++++++++++++++++++++++++#
     print('\n* Plot')
+
+    plt.ioff()
+
     params = {
                 'font.size'           : 8      ,
                 'axes.labelsize': 23,
