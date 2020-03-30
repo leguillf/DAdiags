@@ -161,9 +161,6 @@ def load_DUACSprods(directory,file,name_time,name_lon,name_lat,name_ssh,dt_ref_d
 
     ncin = nc.Dataset(directory + file)
     time_duacs = np.array(ncin.variables[name_time][:]) 
-    if 'swot_en_j1_tpn_g2' in file:
-        # Time correction due to a bug in the data processing
-        time_duacs += 22919 - 19358
     lon_duacs = np.array(ncin.variables[name_lon][:]) % 360
     lat_duacs = np.array(ncin.variables[name_lat][:]) 
     lon2d_duacs, lat2d_duacs = np.meshgrid(lon_duacs,lat_duacs)
