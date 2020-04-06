@@ -232,7 +232,7 @@ if __name__ == '__main__':
     #    Write outputs              #
     #+++++++++++++++++++++++++++++++#
     print('\n* Write outputs')
-    writeOutputs(comp.path_out+exp.name_experiment,prods_ref,prods_duacs,prods_da,opts.prods,datetime_ref,lon_ref,lat_ref)
+    writeOutputs(comp.path_out+exp.name_experiment+'/'+exp.name_exp_save,prods_ref,prods_duacs,prods_da,opts.prods,datetime_ref,lon_ref,lat_ref)
     
 
     

@@ -42,7 +42,7 @@ def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,d
     time_sec_min = (dt_start - dt_ref).total_seconds()
     time_sec_max = (dt_end - dt_ref).total_seconds() 
     # Read timestamp and grid
-    ds = xr.open_mfdataset(directory + file, decode_times=False, combine='nested',concat_dim=name_time)
+    ds = xr.open_mfdataset(directory + file, decode_times=False)
     timestamp = ds[name_time][:].values
     lon = ds[name_lon][:].values % 360
     lat = ds[name_lat][:].values

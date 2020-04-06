@@ -14,6 +14,8 @@ import matplotlib.pylab as plt
 import numpy as np
 from analysis import ana_compute_rmse
 import matplotlib
+from matplotlib.colors import LogNorm
+import cmocean
 matplotlib.use('Agg')
 
 
@@ -298,12 +300,40 @@ def plot_1d(ana_rmse, ana_spec, name_var, labels, path_save):
         item.set_visible(False)
         txt.set_color(colors[i])
         
-    fig.savefig(path_save)
+    fig.savefig(path_save,bbox_inches='tight')
     
     
+def plot_wk(wk, prod, name_exp, path_save):    
+    def _subplot(ax,wavenumber,freq,wk_spectra,norm,cmap,title):
+        plt.pcolormesh(wavenumber,3600*freq,wk_spectra,norm=norm,cmap=cmap) 
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel('wavenumber (cpkm)',fontsize=15)
+        ax.set_ylabel('frequency (cph)',fontsize=15)
+        ax.set_xlim(5E-3,0.1)
+        ax.set_ylim(1E-3,3E-1)
+        ax.set_title(title,size=18)
+        ax.tick_params(labelsize=15)
+        plt.colorbar()
     
+    cmap = cmocean.cm.balance
+
+    fig=plt.figure(figsize=(20,7))
     
+    norm = LogNorm(vmin=1e-13,vmax=1e-5)
     
+    k2d, w2d = np.meshgrid(wk['wavenumber'],wk['frequency'])
+    
+    ax = plt.subplot(121)
+    _subplot(ax,k2d,w2d,k2d*w2d*wk['WK']['ref'][prod],norm,cmap,'ref')
+    
+    ax = plt.subplot(122)
+    _subplot(ax,k2d,w2d,k2d*w2d*wk['WK']['da'][prod],norm,cmap,'DA')
+    
+    fig.savefig(path_save,bbox_inches='tight')
+        
+        
+        
 ##======================================================================================================================##
 ##                MAIN                                                                                                  ##
 ##======================================================================================================================##
@@ -342,7 +372,7 @@ if __name__ == '__main__':
         file_exp = os.path.basename(opts.path_config_exp)
         sys.path.insert(0,dir_exp)
         exp = __import__(file_exp, globals=globals())
-        name_exp = exp.name_experiment
+        name_exp = exp.name_experiment + '/' + exp.name_exp_save
         
     # parameters relative to comparison
     if opts.name_config_comp is None:
@@ -383,3 +413,8 @@ if __name__ == '__main__':
     for prod in opts.prods:
         path_save = path_out+name_exp +'/plot_1d_' + prod
         plot_1d([rmse], [spec], prod, [name_exp], path_save)
+    # WK spectra
+    for prod in opts.prods:
+        path_save = path_out+name_exp +'/plot_wk_' + prod
+        plot_wk(wk, prod, name_exp, path_save)
+        
