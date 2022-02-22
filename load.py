@@ -12,7 +12,7 @@ import xarray as xr
 import numpy as np 
 from datetime import datetime,timedelta
 
-def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,dt_end,dt_ref=datetime(1958,1,1,0,0,0),datetime_type=True,timestep=1):
+def load_dataset(directory,file,name_time,name_lon,name_lat,name_var,time_min,time_max,lon_min,lon_max,lat_min,lat_max,options,dtout):
     """
     NAME 
         load_Refprods
@@ -38,35 +38,42 @@ def load_Refprods(directory,file,name_time,name_lon,name_lat,name_var,dt_start,d
             lat (2D numpy array): latitude of the fields
     """
     
-    # Compute time boundaries in seconds since dt_ref to be compared to timestamps
-    time_sec_min = (dt_start - dt_ref).total_seconds()
-    time_sec_max = (dt_end - dt_ref).total_seconds() 
-    # Read timestamp and grid
-    ds = xr.open_mfdataset(directory + file, decode_times=False, combine='nested',concat_dim=name_time)
-    timestamp = ds[name_time][:].values
-    lon = ds[name_lon][:].values % 360
-    lat = ds[name_lat][:].values
-
-    if len(lon.shape)==3:
-        lon = lon[0,:,:]
-        lat = lat[0,:,:]
-
-    # Find time indexes corresponding to the time boundaries
-    idx_time = (timestamp >= time_sec_min) & (timestamp <= time_sec_max)
-    out_time = ds[name_time][idx_time][::timestep].values
-    # Read variable 
-    var = ds[name_var][idx_time,:,:][::timestep].values
+    # Open data
+    ds = xr.open_mfdataset(directory + file, **options)
     
-    var[var<=-50] = 0.
-    # Compute datetimes corresponding to the indexes found
-    if datetime_type:
-        dt_out_time = []
-        for itime in range(len(out_time)):
-            dt_out_time.append(dt_ref + timedelta(seconds=int(out_time[itime]))) 
-    else: 
-        dt_out_time = out_time
-        
-    return var, np.asarray(dt_out_time), lon, lat
+
+    # Sel
+    if None not in [time_min,time_max]:
+        try:
+            ds = ds.sel({name_time:slice(time_min,time_max)})
+        except:
+            ds = ds.where((time_min<=ds[name_time]) & (time_max>=ds[name_time]),drop=True)
+    if None not in [lon_min,lon_max]:
+        ds = ds.sel({name_lon:slice(lon_min,lon_max)})
+    if None not in [lat_min,lat_max]:
+        ds = ds.sel({name_lat:slice(lat_min,lat_max)})
+    
+    if dtout is not None:
+        dt = (ds[name_time][1]-ds[name_time][0]).values / np.timedelta64(1, 's')
+        isub = int(dtout//dt)
+    else:
+        isub = 1
+
+    time = ds[name_time][::isub].values
+    var = ds[name_var][::isub,:,:].values
+    if len(ds[name_lon].shape)==3:
+        lon = ds[name_lon][0,:,:].values
+        lat = ds[name_lat][0,:,:].values
+    elif len(ds[name_lon].shape)==1:
+        lon,lat = np.meshgrid(ds[name_lon].values,ds[name_lat].values)
+    else:
+        lon = ds[name_lon].values
+        lat = ds[name_lat].values
+
+    datetimes = [datetime.utcfromtimestamp((dt64 - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')) for dt64 in time]
+    datetimes = np.asarray(datetimes)
+
+    return var,datetimes,lon,lat
 
 
 
