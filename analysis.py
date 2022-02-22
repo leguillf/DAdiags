@@ -207,7 +207,7 @@ def compute_wk(data,lon,lat):
     ssh_hanning = wfs.apply_window(ssh_detrended, data.dims, window_type='hanning')
 
     #... Apply hanning windowing ...') 
-    ssh_hat = xfft.fft(ssh_hanning, dim=('time', 'x', 'y'), dx={'x': dx, 'y': dx}, sym=True)
+    ssh_hat = xfft.fft(ssh_hanning, dim=('time', 'x', 'y'), dx={'x': dx, 'y': dy})
 
     #... Apply hanning windowing ...') 
     ssh_psd = xfft.psd(ssh_hat)
@@ -241,7 +241,7 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)        # parameters relative to the DA experiment
-    parser.add_argument('--name_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
+    parser.add_argument('--path_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
     parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--overwrite', default=1, type=int)
     # optional parameters that have to be provided if *path_config_exp* is not provided
@@ -269,23 +269,29 @@ if __name__ == '__main__':
     else:        
         dir_exp = os.path.dirname(opts.path_config_exp)
         file_exp = os.path.basename(opts.path_config_exp)
+        if file_exp[-3:]=='.py':
+            file_exp = file_exp[:-3]
         sys.path.insert(0,dir_exp)
         exp = __import__(file_exp, globals=globals())
         name_exp = exp.name_experiment + '/' + exp.name_exp_save
         
     # parameters relative to comparison
-    if opts.name_config_comp is None:
+    if opts.path_config_comp is None:
         if opts.path_out is not None:
             path_out = opts.path_out
             ncentred = opts.ncentred
             time_offset = opts.time_offset
             DUACS = opts.DUACS
         else:
-            print('Error: either name_config_comp or path_out has to be specified')
+            print('Error: either path_config_comp or path_out has to be specified')
             sys.exit()            
     else:           
-        sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
-        comp = __import__(opts.name_config_comp, globals=globals())
+        dir_comp = os.path.dirname(opts.path_config_comp)
+        sys.path.insert(0,dir_comp)
+        name_comp = os.path.basename(opts.path_config_comp)
+        if name_comp[-3:]=='.py':
+            name_comp = name_comp[:-3]
+        comp = __import__(name_comp, globals=globals())
         path_out = comp.path_out
         if hasattr(comp, 'path_duacs'):
             DUACS = True

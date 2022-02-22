@@ -16,7 +16,7 @@ import load
 import switchvar
 import netCDF4 as nc
 from datetime import datetime
-
+import xarray as xr
 
 
 def _datetime2timestamps(datetimes):
@@ -87,32 +87,24 @@ def writeOutputs(path_out,prods_ref,prods_duacs,prods_da,names_prods,datetimes,l
     if os.path.exists(path_out) is False:
         os.makedirs(path_out)
         
-    ncout = nc.Dataset(path_out + '/data_interpolated.nc', 'w', format='NETCDF3_CLASSIC')
-    print(path_out + '/data_interpolated.nc')
-    # Dimensions
-    ncout.createDimension('time', datetimes.size)
-    ncout.createDimension('x', lon.shape[1])
-    ncout.createDimension('y', lat.shape[0]) 
-    # Grid & timestamps
-    nctime = ncout.createVariable('time', 'f', ('time',))
-    nclon = ncout.createVariable('lon', 'f', ('y','x',))
-    nclat = ncout.createVariable('lat', 'f', ('y','x',))
-    nctime[:] = _datetime2timestamps(datetimes)
-    nclon[:,:] = lon
-    nclat[:,:] = lat
+    varout = {}
+    coords = {}
+    coords['lon'] = (('y','x',),lon)
+    coords['lat'] = (('y','x',),lat)
+    coords['time'] = (('time',),[np.datetime64(dt) for dt in datetimes])
+
     for i,name in enumerate(names_prods):
         # Ref
-        ncref = ncout.createVariable(name+'_ref', 'f', ('time','y','x',))  
-        ncref[:,:,:] = prods_ref[i]
+        varout[name+'_ref'] = (('time','y','x',),prods_ref[i])  
         # DUACS
         if prods_duacs is not None:
-            ncduacs = ncout.createVariable(name+'_duacs', 'f', ('time','y','x',))  
-            ncduacs[:,:,:] = prods_duacs[i]
+            varout[name+'_duacs'] = (('time','y','x',), prods_duacs[i])  
         # DA
-        ncda = ncout.createVariable(name+'_da', 'f', ('time','y','x',))  
-        ncda[:,:,:] = prods_da[i]
-    # Close file
-    ncout.close()
+        varout[name+'_da'] = (('time','y','x',),prods_da[i])  
+    
+    ds = xr.Dataset(varout,coords=coords)
+    ds.to_netcdf(path_out+'/data_interpolated.nc')
+
     return 
 
 ##======================================================================================================================##
@@ -125,7 +117,7 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)     # parameters relative to the DA experiment
-    parser.add_argument('--name_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
+    parser.add_argument('--path_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
     parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--path_save', default=None, type=str)           # Path where the outputs are saved
     opts = parser.parse_args()
@@ -137,6 +129,8 @@ if __name__ == '__main__':
     # parameters relative to the DA experiment
     dir_exp = os.path.dirname(opts.path_config_exp)
     name_exp = os.path.basename(opts.path_config_exp)
+    if name_exp[-3:]=='.py':
+        name_exp = name_exp[:-3]
     sys.path.insert(0,dir_exp)
     exp = __import__(name_exp, globals=globals())
     print(name_exp)
@@ -145,29 +139,29 @@ if __name__ == '__main__':
     else:
         path_save = exp.path_save
     # parameters relative to NATL60 and DUACS 
-    sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
-    comp = __import__(opts.name_config_comp, globals=globals())
-    print(opts.name_config_comp)
+    dir_comp = os.path.dirname(opts.path_config_comp)
+    name_comp = os.path.basename(opts.path_config_comp)
+    if name_comp[-3:]=='.py':
+        name_comp = name_comp[:-3]
+    sys.path.insert(0,dir_comp)
+    comp = __import__(name_comp, globals=globals())
 
     #+++++++++++++++++++++++++++++++#
     #    Load products              #
     #+++++++++++++++++++++++++++++++#
-    print('\n* Load products')            
+    print('\n* Load data')            
     # Reference
-    print('Reference')
-    if hasattr(comp, 'dt_ref'):
-        dt_ref = comp.dt_ref
-    else:
-        dt_ref = datetime(1958,1,1,0,0,0) # For NATL60
-
-    if hasattr(comp,'timestep_ref'):
-        timestep = comp.timestep_ref
-    else:
-        timestep = 1 
-
-    ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_Refprods(
+    print('\t Reference')
+    ssh_ref,datetime_ref,lon_ref,lat_ref = load.load_dataset(
             comp.path_reference,comp.file_reference,comp.name_time_reference,comp.name_lon_reference,comp.name_lat_reference,comp.name_var_reference,
-            exp.init_date,exp.final_date,datetime_type=True, dt_ref=dt_ref, timestep=timestep)
+            comp.time_min,comp.time_max,comp.lon_min,comp.lon_max,comp.lat_min,comp.lat_max,comp.options_ref,comp.dtout)
+    
+    # DA experiment
+    print('\t DA Exp')
+    ssh_da, datetime_da, lon_da, lat_da = load.load_dataset(
+            exp.path_save,'/*.nc','time',exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],
+            comp.time_min,comp.time_max,comp.lon_min,comp.lon_max,comp.lat_min,comp.lat_max,comp.options_exp,comp.dtout)
+    
     # DUACS
     if hasattr(comp, 'path_duacs'):
         DUACS = True
@@ -178,16 +172,13 @@ if __name__ == '__main__':
         print('DUACS')
         ssh_duacs, datetime_duacs, lon_duacs, lat_duacs = load.load_DUACSprods(
                 comp.path_duacs,comp.file_duacs,comp.name_time_duacs,comp.name_lon_duacs,comp.name_lat_duacs,comp.name_var_duacs,bounds=[lon_ref.min(),lon_ref.max(),lat_ref.min(),lat_ref.max()])
-    # DA experiment
-    print('DA')
-    ssh_da, datetime_da, lon_da, lat_da = load.load_DAprods(path_save,exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],exp.init_date,exp.final_date,exp.saveoutput_time_step,prefixe=exp.name_exp_save)
-    
+
     #+++++++++++++++++++++++++++++++#
     #    Switch var                 #
     #+++++++++++++++++++++++++++++++#   
     print("\n* Switch variables : ", ','.join(opts.prods))
-    if hasattr(exp, 'c'):
-        c = exp.c
+    if hasattr(exp, 'c0'):
+        c = exp.c0
     else:
         print('Warning: argument "c" is not defined in experiment config file. Its value is set to 2.2')
         c = 2.2
