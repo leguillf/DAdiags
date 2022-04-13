@@ -39,7 +39,7 @@ def load_dataset(directory,file,name_time,name_lon,name_lat,name_var,time_min,ti
     """
     
     # Open data
-    ds = xr.open_mfdataset(directory + file, **options)
+    ds = xr.open_mfdataset(f'{directory}/{file}', **options)
     
 
     # Sel

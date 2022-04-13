@@ -17,6 +17,7 @@ def ssh2multiple(ssh, lon, lat, varnames, c=2.5, name_grd=None):
     var_list = []
     for var in varnames:
         if var == 'ssh':
+            ssh[np.isnan(ssh)] = 0
             var_list.append(ssh)
         elif var == 'vel':
             u, v = ssh2uv(ssh, lon, lat, name_grd=name_grd)

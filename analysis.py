@@ -21,19 +21,24 @@ def read_data(path_data, prods, bc, time_offset,DUACS=True):
     data = {}
     ds = xr.open_dataset(path_data+'/data_interpolated.nc')
     # Time and grid
+    if bc is None or bc==0:
+        _slice = slice(0,None)
+    else:
+        _slice = slice(bc,-bc)
+
     data['time'] = ds['time'][time_offset:]
-    data['lon'] = ds['lon'][bc:-(bc+1),bc:-(bc+1)]
-    data['lat'] = ds['lat'][bc:-(bc+1),bc:-(bc+1)]
+    data['lon'] = ds['lon'][_slice,_slice]
+    data['lat'] = ds['lat'][_slice,_slice]
     # Variables
     data['ref'] = {}
     if DUACS:
         data['duacs'] = {}
     data['da'] = {}
     for prod in prods:
-        data['ref'][prod] = ds[prod+'_ref'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
+        data['ref'][prod] = ds[prod+'_ref'][time_offset:,_slice,_slice]
         if DUACS:
-            data['duacs'][prod] = ds[prod+'_duacs'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
-        data['da'][prod] = ds[prod+'_da'][time_offset:,bc:-(bc+1),bc:-(bc+1)]
+            data['duacs'][prod] = ds[prod+'_duacs'][time_offset:,_slice,_slice]
+        data['da'][prod] = ds[prod+'_da'][time_offset:,_slice,_slice]
     
     return data
 
@@ -84,12 +89,15 @@ def ana_spec(data, prods,DUACS=True,r=0.5):
 
 
 
-def ana_compute_spec(data,lon,lat,ncentred=20):
+def ana_compute_spec(data,lon,lat,ncentred=None):
     
     psd2D_list = []
     for t in range(data.shape[0]):
         # Compute PSD of the fields and the erros at each timestamp
-        wavenumber, psd2D = wavenumber_spectra(np.ma.array(data[t,ncentred:-(ncentred+1),ncentred:-(ncentred+1)]),lon[ncentred:-(ncentred+1),ncentred:-(ncentred+1)],lat[ncentred:-(ncentred+1),ncentred:-(ncentred+1)]) 
+        if ncentred is not None:
+            wavenumber, psd2D = wavenumber_spectra(np.ma.array(data[t,ncentred:-(ncentred+1),ncentred:-(ncentred+1)]),lon[ncentred:-(ncentred+1),ncentred:-(ncentred+1)],lat[ncentred:-(ncentred+1),ncentred:-(ncentred+1)]) 
+        else:
+            wavenumber, psd2D = wavenumber_spectra(np.ma.array(data[t,:,:]),lon,lat)
         psd2D_list.append(psd2D)
         
     return wavenumber,np.mean(psd2D_list,axis=0)
@@ -112,10 +120,10 @@ def ana_rmse(data, prods, DUACS=True):
         NT,NY,NX = data['ref'][prod].shape   
         if DUACS:
             RMSE['duacs'][prod] = ana_compute_rmse(data['ref'][prod].values, data['duacs'][prod].values)
-            Score['duacs'][prod] = 1 - RMSE['duacs'][prod]/np.std(data['ref'][prod].values)
+            Score['duacs'][prod] = 1 - RMSE['duacs'][prod]/np.nanstd(data['ref'][prod].values,axis=(1,2))
             Num['duacs'][prod] = np.mean(Score['duacs'][prod])
         RMSE['da'][prod] = ana_compute_rmse(data['ref'][prod].values, data['da'][prod].values)
-        Score['da'][prod] = 1 - RMSE['da'][prod]/np.std(data['ref'][prod].values)        
+        Score['da'][prod] = 1 - RMSE['da'][prod]/np.nanstd(data['ref'][prod].values,axis=(1,2))        
         Num['da'][prod] = np.mean(Score['da'][prod])
         
     return {'time':data['time'], 'RMSE':RMSE, 'Score':Score, 'Num':Num}
@@ -123,7 +131,7 @@ def ana_rmse(data, prods, DUACS=True):
 
 
 
-def ana_compute_rmse(reference, DAprod, normalized=False,ncentred=None):  
+def ana_compute_rmse(reference, DAprod, normalized=False):  
     """
     NAME 
         diag_computing_rmse
@@ -134,7 +142,6 @@ def ana_compute_rmse(reference, DAprod, normalized=False,ncentred=None):
             reference (3d array) : temporal serie of true fields (typically from the NATL60 run)
             DAprod (3d array) : temporal serie of results from a data assimilation experiment. 
             normalized (bool) : if True, the RMSE is normalized. Default is False.
-            ncentred (int): lenght of the peripherical band for which RMSE is not computed
             
         Returns: 
             RMSE (1d array) : temporal serie of the RMSE between the two fields.
@@ -150,32 +157,32 @@ def ana_compute_rmse(reference, DAprod, normalized=False,ncentred=None):
     if reference.shape[1:] != DAprod.shape[1:] :
         print('Error : grids are not of the same dimensions. Stop here')
         return  
-
+    
     for itime in range(ntime):
-        
+
+        _ssh_ref = +reference[itime]
+        _ssh_exp = +DAprod[itime]
+        mask = np.isnan(_ssh_ref+_ssh_exp)
+        if np.all(mask):
+            continue
+        _ssh_ref[mask] = 0
+        _ssh_exp[mask] = 0
+
         if normalized:
-            if ncentred is not None:
-                rmse = np.sqrt(np.sum(np.sum(np.square(DAprod[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)]-reference[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)])))/nlon/nlat) / \
-                    ( np.max(np.max(reference[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)]))-np.min(np.min(reference[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)])) )
-            else:
-                rmse = np.sqrt(np.sum(np.sum(np.square(DAprod[itime,:,:]-reference[itime,:,:])))/nlon/nlat) / ( np.max(np.max(reference[itime,:,:]))-np.min(np.min(reference[itime,:,:])) )
+            rmse = np.sqrt(np.sum(np.sum(np.square(_ssh_exp-_ssh_ref)))/nlon/nlat) / ( np.max(np.max(_ssh_ref))-np.min(np.min(_ssh_ref)))
         else:
-            if ncentred is not None:
-                rmse = np.sqrt(np.sum(np.sum(np.square(DAprod[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)]-reference[itime,ncentred:-(ncentred+1),ncentred:-(ncentred+1)])))/nlon/nlat)
-            else:
-                rmse = np.sqrt(np.sum(np.sum(np.square(DAprod[itime,:,:]-reference[itime,:,:])))/nlon/nlat)
+            rmse = np.sqrt(np.sum(np.sum(np.square(_ssh_exp-_ssh_ref)))/nlon/nlat)
             
         RMSE[itime] = rmse
-        
     return RMSE
 
 def ana_wk(data,prods,DUACS=True):
     if DUACS:
         WK = {'ref':{},'duacs':{},'da':{}}
-        Score = {'duacs':{},'da':{}}
+        WK_err = {'duacs':{},'da':{}}
     else:
         WK = {'ref':{},'da':{}}
-        Score = {'da':{}}
+        WK_err = {'da':{}}
 
     lon = data['lon']
     lat = data['lat']
@@ -186,13 +193,11 @@ def ana_wk(data,prods,DUACS=True):
         WK['ref'][prod] = WK_ref
         if DUACS:
             WK['duacs'][prod] = compute_wk(data['duacs'][prod],lon,lat)[2]
-            WK_err_duacs = compute_wk(data['duacs'][prod]-data['ref'][prod],lon,lat)[2]
-            Score['duacs'][prod] = 1 - WK_err_duacs / WK_ref
+            WK_err['duacs'][prod] = compute_wk(data['duacs'][prod]-data['ref'][prod],lon,lat)[2]
         WK['da'][prod] = compute_wk(data['da'][prod],lon,lat)[2]
-        WK_err_da = compute_wk(data['da'][prod]-data['ref'][prod],lon,lat)[2]
-        Score['da'][prod] = 1 - WK_err_da / WK_ref
+        WK_err['da'][prod] = compute_wk(data['da'][prod]-data['ref'][prod],lon,lat)[2]
 
-    return {'wavenumber':wavenumber, 'frequency':frequency, 'WK':WK, 'Score':Score}
+    return {'wavenumber':wavenumber, 'frequency':frequency*24*3600, 'WK':WK, 'Err':WK_err}
 
 
 def compute_wk(data,lon,lat):
@@ -242,7 +247,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)        # parameters relative to the DA experiment
     parser.add_argument('--path_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
-    parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--overwrite', default=1, type=int)
     # optional parameters that have to be provided if *path_config_exp* is not provided
     parser.add_argument('--name_exp', default=None, type=str)               
@@ -322,25 +326,25 @@ if __name__ == '__main__':
         #    Read interpolated fields   #
         #+++++++++++++++++++++++++++++++#
         print('\n* Read interpolated fields')
-        data = read_data(path_out+name_exp, opts.prods, ncentred, time_offset, DUACS=DUACS)
+        data = read_data(path_out+name_exp, comp.prods, ncentred, time_offset, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    RMSE Analysis              #
         #+++++++++++++++++++++++++++++++#
         print('\n* RMSE Analysis')
-        rmse = ana_rmse(data, opts.prods, DUACS=DUACS)
+        rmse = ana_rmse(data, comp.prods, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    Spectral Analysis          #
         #+++++++++++++++++++++++++++++++#
         print('\n* Spectral Analysis')
-        spec = ana_spec(data, opts.prods, DUACS=DUACS)
+        spec = ana_spec(data, comp.prods, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    WK Analysis          #
         #+++++++++++++++++++++++++++++++#
         print('\n* WK Analysis')
-        wk = ana_wk(data, opts.prods, DUACS=DUACS)
+        wk = ana_wk(data, comp.prods, DUACS=DUACS)
         
         #+++++++++++++++++++++++++++++++#
         #    Dump Analysis              #

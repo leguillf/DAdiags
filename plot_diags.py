@@ -316,8 +316,7 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)        # parameters relative to the DA experiment
-    parser.add_argument('--name_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
-    parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
+    parser.add_argument('--path_config_comp', default=None, type=str)       # parameters relative to NATL60 and DUACS 
     # optional parameters that have to be provided if *path_config_exp* is not provided
     parser.add_argument('--name_exp', default=None, type=str)               
     # optional parameters that have to be provided if *name_config_comp* is not provided
@@ -341,19 +340,25 @@ if __name__ == '__main__':
         dir_exp = os.path.dirname(opts.path_config_exp)
         file_exp = os.path.basename(opts.path_config_exp)
         sys.path.insert(0,dir_exp)
+        if file_exp[-3:]=='.py':
+            file_exp = file_exp[:-3]
         exp = __import__(file_exp, globals=globals())
         name_exp = exp.name_experiment
         
     # parameters relative to comparison
-    if opts.name_config_comp is None:
+    if opts.path_config_comp is None:
         if opts.path_out is not None:
             path_out = opts.path_out
         else:
-            print('Error: either name_config_comp or path_out has to be specified')
+            print('Error: either path_config_comp or path_out has to be specified')
             sys.exit()            
     else:           
-        sys.path.insert(0,os.path.join(os.path.dirname(__file__), "configs"))
-        comp = __import__(opts.name_config_comp, globals=globals())
+        dir_comp = os.path.dirname(opts.path_config_comp)
+        file_comp = os.path.basename(opts.path_config_comp)
+        sys.path.insert(0,dir_comp)
+        if file_comp[-3:]=='.py':
+            file_comp = file_comp[:-3]
+        comp = __import__(file_comp, globals=globals())
         path_out = comp.path_out
         
     #+++++++++++++++++++++++++++++++#
@@ -380,6 +385,6 @@ if __name__ == '__main__':
         rmse, spec, wk = pickle.load(f)
     
     # Plot 1d    
-    for prod in opts.prods:
+    for prod in comp.prods:
         path_save = path_out+name_exp +'/plot_1d_' + prod
         plot_1d([rmse], [spec], prod, [name_exp], path_save)

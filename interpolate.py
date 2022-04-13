@@ -118,7 +118,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)     # parameters relative to the DA experiment
     parser.add_argument('--path_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
-    parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--path_save', default=None, type=str)           # Path where the outputs are saved
     opts = parser.parse_args()
     
@@ -138,14 +137,18 @@ if __name__ == '__main__':
         path_save = opts.path_save
     else:
         path_save = exp.path_save
-    # parameters relative to NATL60 and DUACS 
+    # parameters for performance evaluation
     dir_comp = os.path.dirname(opts.path_config_comp)
     name_comp = os.path.basename(opts.path_config_comp)
     if name_comp[-3:]=='.py':
         name_comp = name_comp[:-3]
     sys.path.insert(0,dir_comp)
     comp = __import__(name_comp, globals=globals())
-
+    
+    if os.path.exists(comp.path_out+exp.name_experiment) is False:
+        os.makedirs(comp.path_out+exp.name_experiment)
+    os.system('cp ' + dir_exp + '/' + name_exp + '.py' + ' ' + comp.path_out+exp.name_experiment + '/config.py')
+    
     #+++++++++++++++++++++++++++++++#
     #    Load products              #
     #+++++++++++++++++++++++++++++++#
@@ -159,9 +162,9 @@ if __name__ == '__main__':
     # DA experiment
     print('\t DA Exp')
     ssh_da, datetime_da, lon_da, lat_da = load.load_dataset(
-            exp.path_save,'/*.nc','time',exp.name_mod_lon,exp.name_mod_lat,exp.name_mod_var[0],
+            exp.path_save,'/*.nc','time',exp.name_mod_lon,exp.name_mod_lat,comp.name_var_exp,
             comp.time_min,comp.time_max,comp.lon_min,comp.lon_max,comp.lat_min,comp.lat_max,comp.options_exp,comp.dtout)
-    
+
     # DUACS
     if hasattr(comp, 'path_duacs'):
         DUACS = True
@@ -176,7 +179,7 @@ if __name__ == '__main__':
     #+++++++++++++++++++++++++++++++#
     #    Switch var                 #
     #+++++++++++++++++++++++++++++++#   
-    print("\n* Switch variables : ", ','.join(opts.prods))
+    print("\n* Switch variables : ", ','.join(comp.prods))
     if hasattr(exp, 'c0'):
         c = exp.c0
     else:
@@ -184,14 +187,14 @@ if __name__ == '__main__':
         c = 2.2
     # Reference
     print('Reference')
-    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,opts.prods,c,name_grd='grid_'+exp.name_experiment)
+    prods_ref = switchvar.ssh2multiple(ssh_ref,lon_ref,lat_ref,comp.prods,c,name_grd='grid_'+exp.name_experiment)
     # DUACS
     if DUACS:
         print('DUACS')
-        prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,opts.prods,c,name_grd='grid_'+exp.name_experiment)
+        prods_duacs = switchvar.ssh2multiple(ssh_duacs,lon_duacs,lat_duacs,comp.prods,c,name_grd='grid_'+exp.name_experiment)
     # DA
     print('DA')
-    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,opts.prods,c,name_grd='grid_'+exp.name_experiment)
+    prods_da = switchvar.ssh2multiple(ssh_da,lon_da,lat_da,comp.prods,c,name_grd='grid_'+exp.name_experiment)
 
     #+++++++++++++++++++++++++++++++#
     #    Time interpolation         #
@@ -223,7 +226,7 @@ if __name__ == '__main__':
     #    Write outputs              #
     #+++++++++++++++++++++++++++++++#
     print('\n* Write outputs')
-    writeOutputs(comp.path_out+exp.name_experiment,prods_ref,prods_duacs,prods_da,opts.prods,datetime_ref,lon_ref,lat_ref)
+    writeOutputs(comp.path_out+exp.name_experiment,prods_ref,prods_duacs,prods_da,comp.prods,datetime_ref,lon_ref,lat_ref)
     
 
     

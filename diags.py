@@ -24,23 +24,31 @@ def compute_mean_rmse(rmse, prods, name):
 def compute_space_res(wk, prods, name, r=0.5):
     
     space_res = []
-    wavenumber = wk['wavenumber'] *1e3  # in cycle/km
-    score = wk['Score']
+    wavenumber = wk['wavenumber']   # in cycle/km
+    
     for prod in prods:
-        print(score[name][prod].mean(axis=0))
-        f = interpolate.interp1d(score[name][prod].mean(axis=0), 1/wavenumber, axis=0)   
-        space_res.append(f(r))
+        score = 1 - wk['Err'][name][prod].mean(axis=0)/wk['WK']['ref'][prod].mean(axis=0)
+        f = interpolate.interp1d(score, 1/wavenumber, axis=0)   
+        try:
+            res = f(r)
+        except:
+            res = np.nan
+        space_res.append(res)
         
     return space_res
 
 def compute_time_res(wk, prods, name, r=0.5):
 
     time_res = []
-    frequency = wk['frequency'] *24*3600  # in cycle/day
-    score = wk['Score']
+    frequency = wk['frequency']  # in cycle/day
     for prod in prods:
-        f = interpolate.interp1d(score[name][prod].mean(axis=1), 1/frequency, axis=0)
-        time_res.append(f(r))
+        score = 1 - wk['Err'][name][prod].mean(axis=1)/wk['WK']['ref'][prod].mean(axis=1)
+        f = interpolate.interp1d(score, 1/frequency, axis=0)
+        try:
+            res = f(r)
+        except:
+            res = np.nan
+        time_res.append(res)
 
     return time_res
 
@@ -51,24 +59,24 @@ def write_outputs(file,mean_rmse_duacs,mean_rmse_da,space_res_duacs,space_res_da
         f.write('DUACS\n')
         f.write('\t RMSE:\n' )
         for i,prod in enumerate(prods):
-            f.write('\t\t' + prod + ': ' + "{.2}".format(mean_rmse_duacs[i]) + '\n') 
+            f.write('\t\t' + prod + ': ' + f"{(mean_rmse_duacs[i]):02d}" + '\n') 
         f.write('\t Space Res:\n' )
         for i,prod in enumerate(prods):
-            f.write('\t\t' + prod + ': ' + "{.2}".format(space_res_duacs[i]) + '\n')
+            f.write('\t\t' + prod + ': ' + f"{(space_res_duacs[i]):02d}" + '\n')
         f.write('\t Time Res:\n' )
         for i,prod in enumerate(prods):
-            f.write('\t\t' + prod + ': ' + "{.2}".format(time_res_duacs[i]) + '\n')
+            f.write('\t\t' + prod + ': ' + f"{(time_res_duacs[i]):02d}" + '\n')
     # DA
     f.write('\nDA\n')
     f.write('\t RMSE:\n' )
     for i,prod in enumerate(prods):
-        f.write('\t\t' + prod + ': ' + "{.2}".format(mean_rmse_da[i]) + '\n') 
+        f.write('\t\t' + prod + ': ' + f"{(mean_rmse_da[i]):02f}" + '\n') 
     f.write('\t Space Res:\n' )
     for i,prod in enumerate(prods):
-        f.write('\t\t' + prod + ': ' + "{.2}".format(space_res_da[i]) + '\n')
+        f.write('\t\t' + prod + ': ' + f"{(space_res_da[i]):02f}" + '\n')
     f.write('\t Time Res:\n' )
     for i,prod in enumerate(prods):
-        f.write('\t\t' + prod + ': ' + "{.2}".format(time_res_da[i]) + '\n')
+        f.write('\t\t' + prod + ': ' + f"{(time_res_da[i]):02f}" + '\n')
                 
 
 ##======================================================================================================================##
@@ -82,7 +90,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--path_config_exp', default=None, type=str)     # parameters relative to the DA experiment
     parser.add_argument('--path_config_comp', default=None, type=str)    # parameters relative to NATL60 and DUACS 
-    parser.add_argument('--prods', default=['ssh'],nargs='+', type=str)
     parser.add_argument('--overwrite', default=1, type=int)
     opts = parser.parse_args()
         
@@ -132,13 +139,15 @@ if __name__ == '__main__':
         #    Evaluate metrics           #
         #+++++++++++++++++++++++++++++++#
         print('\n* Evaluate metrics ')
-        mean_rmse_da = compute_mean_rmse(rmse, opts.prods, name='da')
-        space_res_da = compute_space_res(wk, opts.prods, name='da')
-        time_res_da = compute_time_res(wk, opts.prods, name='da')
+        mean_rmse_da = compute_mean_rmse(rmse, comp.prods, name='da')
+        space_res_da = compute_space_res(wk, comp.prods, name='da')
+        print(space_res_da)
+        time_res_da = compute_time_res(wk, comp.prods, name='da')
+        print(time_res_da)
         if DUACS:
-            mean_rmse_duacs = compute_mean_rmse(rmse, opts.prods, name='duacs')
-            space_res_duacs = compute_space_res(wk, opts.prods, name='duacs')
-            time_res_duacs = compute_time_res(wk, opts.prods, name='da')
+            mean_rmse_duacs = compute_mean_rmse(rmse, comp.prods, name='duacs')
+            space_res_duacs = compute_space_res(wk, comp.prods, name='duacs')
+            time_res_duacs = compute_time_res(wk, comp.prods, name='da')
         else:
             mean_rmse_duacs = space_res_duacs = time_res_duacs = None
             
@@ -147,7 +156,7 @@ if __name__ == '__main__':
         #+++++++++++++++++++++++++++++++#
         print('\n* Write outputs ')
         print(file_outputs)
-        write_outputs(file_outputs, mean_rmse_duacs,mean_rmse_da,space_res_duacs,space_res_da,time_res_duacs,time_res_da, opts.prods)
+        write_outputs(file_outputs, mean_rmse_duacs,mean_rmse_da,space_res_duacs,space_res_da,time_res_duacs,time_res_da, comp.prods)
         
 
         
