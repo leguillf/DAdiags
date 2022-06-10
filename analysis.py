@@ -277,7 +277,7 @@ if __name__ == '__main__':
             file_exp = file_exp[:-3]
         sys.path.insert(0,dir_exp)
         exp = __import__(file_exp, globals=globals())
-        name_exp = exp.name_experiment
+        name_exp = exp.name_experiment + '/' + exp.name_exp_save
         
     # parameters relative to comparison
     if opts.path_config_comp is None:
