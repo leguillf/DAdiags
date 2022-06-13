@@ -373,7 +373,7 @@ if __name__ == '__main__':
         if file_exp[-3:]=='.py':
             file_exp = file_exp[:-3]
         exp = __import__(file_exp, globals=globals())
-        name_exp = exp.name_experiment + '/' + exp.name_exp_save
+        name_exp = exp.name_exp_save
         
     # parameters relative to comparison
     if opts.path_config_comp is None:
@@ -419,7 +419,7 @@ if __name__ == '__main__':
         path_save = path_out+name_exp +'/plot_1d_' + prod
         plot_1d([rmse], [spec], prod, [name_exp], path_save)
     # WK spectra
-    for prod in opts.prods:
+    for prod in comp.prods:
         path_save = path_out+name_exp +'/plot_wk_' + prod
         plot_wk(wk, prod, name_exp, path_save)
         
